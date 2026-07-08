@@ -1,0 +1,646 @@
+import { useEffect, useRef, useState } from 'react'
+import { useQuery } from 'convex/react'
+import { api } from '../convex/_generated/api'
+import GlobeView from './GlobeView'
+import Celebration from './Celebration'
+import { EntryForm, RecentEntries, DemoTools, BoostToggle } from './EntryPanel'
+import { downloadShareCard } from './shareCard'
+import {
+  GOAL,
+  KIOSK_PIN,
+  MACHINES,
+  MACHINE_COLORS,
+  MILESTONES,
+  Milestone,
+  BRAND,
+  MARATHON,
+  EVEREST,
+  fmt,
+  fmtKm,
+  challengeDay,
+  paceTarget,
+  CHALLENGE_DAYS,
+  CHALLENGE_START,
+} from './config'
+import { locationLabel } from './geo'
+
+const REPLAY_MS = 50_000
+const REPLAY_TICK = 120
+
+// Smoothly animate a number toward its target — makes the big counter "tick up".
+function useAnimatedNumber(target: number, ms = 1400) {
+  const [display, setDisplay] = useState(target)
+  const fromRef = useRef(target)
+  const rafRef = useRef(0)
+  useEffect(() => {
+    const from = fromRef.current
+    if (from === target) return
+    // rAF is frozen in hidden tabs — don't animate, just show the value.
+    if (document.hidden) {
+      setDisplay(target)
+      fromRef.current = target
+      return
+    }
+    const start = performance.now()
+    cancelAnimationFrame(rafRef.current)
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / ms)
+      const eased = 1 - Math.pow(1 - t, 3)
+      const val = from + (target - from) * eased
+      setDisplay(val)
+      fromRef.current = val
+      if (t < 1) rafRef.current = requestAnimationFrame(tick)
+    }
+    rafRef.current = requestAnimationFrame(tick)
+    // Failsafe: whatever happens to the animation, land on the exact target.
+    const snap = setTimeout(() => {
+      setDisplay(target)
+      fromRef.current = target
+    }, ms + 250)
+    return () => {
+      cancelAnimationFrame(rafRef.current)
+      clearTimeout(snap)
+    }
+  }, [target, ms])
+  return display
+}
+
+const BAR_LABELS: { m: number; label: string }[] = [
+  { m: 0, label: 'Tulsa' },
+  { m: 2_350_000, label: 'NYC' },
+  { m: 7_600_000, label: 'Dublin' },
+  { m: 11_200_000, label: 'Istanbul' },
+  { m: 14_200_000, label: 'Dubai' },
+  { m: 19_100_000, label: 'Bangkok' },
+  { m: 26_100_000, label: 'Tokyo' },
+  { m: 32_300_000, label: 'Honolulu' },
+  { m: 36_400_000, label: 'LA' },
+  { m: 40_000_000, label: 'Tulsa' },
+]
+
+function localDayKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+type DailyRow = { key: string; journey: number; byMachine: Record<string, number> }
+
+function RecapOverlay({
+  row,
+  cumBefore,
+  dayNum,
+  onDone,
+}: {
+  row: DailyRow
+  cumBefore: number
+  dayNum: number
+  onDone: () => void
+}) {
+  const from = locationLabel(cumBefore)
+  const to = locationLabel(cumBefore + row.journey)
+  const bestMachine = Object.entries(row.byMachine).sort((a, b) => b[1] - a[1])[0]
+  const rootRef = useRef<HTMLDivElement>(null)
+  const onDoneRef = useRef(onDone)
+  onDoneRef.current = onDone
+  useEffect(() => {
+    const t = setTimeout(onDone, 20_000)
+    return () => clearTimeout(t)
+  }, [onDone])
+  // Native listener — same reliability fix as Celebration dismissal.
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const h = () => onDoneRef.current()
+    el.addEventListener('click', h)
+    return () => el.removeEventListener('click', h)
+  }, [])
+
+  return (
+    <div
+      ref={rootRef}
+      className="fixed inset-0 z-40 flex items-center justify-center celeb-fade cursor-pointer"
+      style={{ background: 'radial-gradient(ellipse at center, rgba(20,20,24,0.96) 0%, rgba(5,5,5,0.99) 80%)' }}
+    >
+      <div className="relative text-center px-8 celeb-in max-w-4xl">
+        <img
+          src="/logo-t.png"
+          alt=""
+          className="w-14 h-14 mx-auto mb-4 rounded-full"
+          style={{ border: `2px solid ${BRAND.red}`, boxShadow: `0 0 14px ${BRAND.red}66` }}
+        />
+        <div className="text-sm font-bold tracking-[0.5em] uppercase mb-3" style={{ color: BRAND.pink }}>
+          {dayNum > 0 ? `Day ${dayNum} recap` : 'Yesterday'}
+        </div>
+        <div className="font-display uppercase leading-none text-white" style={{ fontSize: 'clamp(2.5rem, 7vw, 5rem)' }}>
+          {fmt(row.journey)} meters
+        </div>
+        <div className="mt-5 text-lg text-zinc-300">
+          {from.where.replace('Past ', 'Woke up past ')} <span style={{ color: BRAND.red }}>→</span>{' '}
+          {to.where.toLowerCase().replace('past', 'went to sleep past')}
+        </div>
+        {bestMachine && (
+          <div className="mt-4 inline-block px-4 py-1.5 rounded-full text-sm font-bold" style={{ background: '#161616', border: '1px solid #2a2a2a' }}>
+            Workhorse of the day:{' '}
+            <span style={{ color: MACHINE_COLORS[bestMachine[0] as (typeof MACHINES)[number]] ?? '#fff' }}>
+              {bestMachine[0]}
+            </span>{' '}
+            · {fmtKm(bestMachine[1])}
+          </div>
+        )}
+        <div className="mt-8 text-xs uppercase tracking-widest text-zinc-500">Click to dismiss</div>
+      </div>
+    </div>
+  )
+}
+
+export default function App() {
+  const summary = useQuery(api.worldTour.getSummary)
+  const settings = useQuery(api.worldTour.getSettings)
+  const daily = useQuery(api.worldTour.getDaily)
+  const [tvMode, setTvMode] = useState(false)
+  const [kiosk, setKiosk] = useState(() => localStorage.getItem('tt-kiosk') === '1')
+  const [celebQueue, setCelebQueue] = useState<Milestone[]>([])
+  const [flyToSignal, setFlyToSignal] = useState(0)
+  const [showRecap, setShowRecap] = useState(false)
+  const [replayValue, setReplayValue] = useState<number | null>(null)
+  const prevTotal = useRef<number | null>(null)
+  const replayTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(t)
+  }, [])
+
+  const total = summary?.totalJourney ?? 0
+  const boostActive = settings?.boostActive ?? false
+  const replaying = replayValue !== null
+  const shownTotal = replaying ? replayValue! : total
+  const animatedTotal = useAnimatedNumber(total)
+
+  // Detect crossed milestones → queue celebrations + fly the camera.
+  useEffect(() => {
+    if (summary === undefined) return
+    if (prevTotal.current === null) {
+      prevTotal.current = total
+      return
+    }
+    const prev = prevTotal.current
+    if (total > prev) {
+      let crossed = MILESTONES.filter((ms) => ms.m > prev && ms.m <= total)
+      // A big catch-up entry can cross many milestones at once — celebrate only
+      // the majors plus the most recent one, so the TV isn't stuck in overlays.
+      if (crossed.length > 2) {
+        const majors = crossed.filter((c) => c.major || c.kind === 'finish' || c.kind === 'stretch')
+        const last = crossed[crossed.length - 1]
+        crossed = majors.includes(last) ? majors : [...majors, last]
+      }
+      if (crossed.length > 0) {
+        setCelebQueue((q) => [...q, ...crossed])
+        setFlyToSignal((s) => s + 1)
+      }
+    }
+    prevTotal.current = total
+  }, [total, summary])
+
+  // Morning auto-recap: once per day, before 11 AM, when yesterday had meters.
+  const yesterdayKey = localDayKey(new Date(now.getTime() - 86_400_000))
+  const todayKey = localDayKey(now)
+  const yesterdayRow = daily?.find((d) => d.key === yesterdayKey) ?? null
+  const cumBeforeYesterday = (daily ?? [])
+    .filter((d) => d.key < yesterdayKey)
+    .reduce((s, d) => s + d.journey, 0)
+  useEffect(() => {
+    if (!yesterdayRow || replaying) return
+    const hour = now.getHours()
+    if (hour >= 5 && hour < 11 && localStorage.getItem('tt-recap') !== todayKey) {
+      localStorage.setItem('tt-recap', todayKey)
+      setShowRecap(true)
+    }
+  }, [yesterdayRow, todayKey, now, replaying])
+
+  // Fullscreen sync for TV mode
+  useEffect(() => {
+    const onFs = () => {
+      if (!document.fullscreenElement) setTvMode(false)
+    }
+    document.addEventListener('fullscreenchange', onFs)
+    return () => document.removeEventListener('fullscreenchange', onFs)
+  }, [])
+
+  function enterTvMode() {
+    setTvMode(true)
+    document.documentElement.requestFullscreen?.().catch(() => {})
+  }
+  function exitTvMode() {
+    setTvMode(false)
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+  }
+
+  function trainerLogin() {
+    const pin = window.prompt('Trainer PIN:')
+    if (pin === KIOSK_PIN) {
+      localStorage.setItem('tt-kiosk', '1')
+      setKiosk(true)
+    } else if (pin !== null) {
+      window.alert('Wrong PIN')
+    }
+  }
+  function trainerLock() {
+    localStorage.removeItem('tt-kiosk')
+    setKiosk(false)
+  }
+
+  function startReplay() {
+    if (total <= 0 || replaying) return
+    setCelebQueue([])
+    setShowRecap(false)
+    const steps = Math.ceil(REPLAY_MS / REPLAY_TICK)
+    const inc = total / steps
+    let v = 0
+    setReplayValue(0)
+    replayTimer.current = setInterval(() => {
+      v += inc
+      if (v >= total) {
+        if (replayTimer.current) clearInterval(replayTimer.current)
+        setReplayValue(total)
+        setTimeout(() => setReplayValue(null), 3000)
+      } else {
+        setReplayValue(v)
+      }
+    }, REPLAY_TICK)
+  }
+  function stopReplay() {
+    if (replayTimer.current) clearInterval(replayTimer.current)
+    setReplayValue(null)
+  }
+  useEffect(() => () => {
+    if (replayTimer.current) clearInterval(replayTimer.current)
+  }, [])
+
+  const day = challengeDay(now)
+  const daysToStart = Math.max(0, Math.ceil((CHALLENGE_START.getTime() - now.getTime()) / 86_400_000))
+  const pace = paceTarget(now)
+  const paceDiff = total - pace
+  const pct = Math.min(100, (shownTotal / GOAL) * 100)
+  const loc = locationLabel(shownTotal)
+  const celeb = celebQueue[0] ?? null
+
+  // Projected arrival: rate from challenge start (or first entry, pre-September).
+  let projected: Date | null = null
+  if (total > 0 && total < GOAL && summary?.firstEntryAt) {
+    const rateBasis = day > 0 ? CHALLENGE_START.getTime() : summary.firstEntryAt
+    const elapsed = now.getTime() - rateBasis
+    if (elapsed > 60_000) {
+      const rate = total / elapsed // meters per ms
+      projected = new Date(now.getTime() + (GOAL - total) / rate)
+    }
+  }
+
+  const unlocked = MILESTONES.filter((ms) => ms.m <= total)
+  const nextMilestone = MILESTONES.find((ms) => ms.m > total)
+  const feed = unlocked.slice(-6).reverse()
+
+  if (summary === undefined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#050505]">
+        <img
+          src="/logo-t.png"
+          alt=""
+          className="w-20 h-20 rounded-full pulse-dot"
+          style={{ border: `2px solid ${BRAND.red}` }}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen text-white bg-[#050505]">
+      {celeb && !replaying && (
+        <Celebration milestone={celeb} day={day} onDone={() => setCelebQueue((q) => q.slice(1))} />
+      )}
+      {showRecap && yesterdayRow && !celeb && !replaying && (
+        <RecapOverlay
+          row={yesterdayRow}
+          cumBefore={cumBeforeYesterday}
+          dayNum={challengeDay(new Date(now.getTime() - 86_400_000))}
+          onDone={() => setShowRecap(false)}
+        />
+      )}
+
+      {/* ── Header ── */}
+      {!tvMode && (
+        <div className="relative" style={{ borderBottom: '1px solid #171717', zIndex: 20 }}>
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: 'radial-gradient(ellipse 70% 100% at 50% 0%, rgba(217,59,88,0.13) 0%, transparent 70%)' }}
+          />
+          <div className="relative max-w-screen-2xl mx-auto px-4 py-3 flex flex-wrap items-center gap-4 justify-between">
+            <div className="flex items-center gap-3">
+              <img
+                src="/logo-t.png"
+                alt=""
+                className="w-12 h-12 rounded-full"
+                style={{ border: `1.5px solid ${BRAND.darkRed}` }}
+              />
+              <div>
+                <div className="text-xs font-bold tracking-[0.3em] uppercase" style={{ color: BRAND.red }}>
+                  Tulsa Training
+                </div>
+                <div className="font-display text-2xl uppercase tracking-wide leading-none">World Tour</div>
+              </div>
+              <button
+                onClick={enterTvMode}
+                className="ml-2 px-4 py-2 rounded-lg font-black text-xs uppercase tracking-widest transition-all hover:opacity-80"
+                style={{ background: '#141414', border: `1px solid ${BRAND.darkRed}`, color: BRAND.pink }}
+              >
+                TV mode
+              </button>
+              {kiosk ? (
+                <>
+                  <BoostToggle />
+                  <button
+                    onClick={trainerLock}
+                    className="px-3 py-2 rounded-lg font-bold text-xs uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors"
+                    style={{ background: '#141414', border: '1px solid #2a2a2a' }}
+                  >
+                    Lock
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={trainerLogin}
+                  className="px-3 py-2 rounded-lg font-bold text-xs uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors"
+                  style={{ background: '#141414', border: '1px solid #2a2a2a' }}
+                >
+                  Trainer login
+                </button>
+              )}
+            </div>
+            {kiosk && <EntryForm />}
+          </div>
+        </div>
+      )}
+
+      {/* ── Globe hero ── */}
+      <div
+        className="relative w-full"
+        style={{ height: tvMode ? '72vh' : '58vh', background: '#050505' }}
+        onDoubleClick={tvMode ? exitTvMode : undefined}
+      >
+        <GlobeView totalMeters={shownTotal} paceMeters={replaying ? 0 : pace} flyToSignal={flyToSignal} follow={replaying} />
+
+        {/* Boost banner */}
+        {boostActive && !replaying && (
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none">
+            <div
+              className="pulse-dot px-6 py-2 rounded-b-xl font-display uppercase tracking-wide text-lg"
+              style={{ background: BRAND.red, color: '#fff', boxShadow: `0 0 30px ${BRAND.red}88` }}
+            >
+              Boost day — every meter counts twice
+            </div>
+          </div>
+        )}
+
+        {/* Countdown — only inside the final week before September 1 */}
+        {day === 0 && daysToStart <= 7 && !replaying && (
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center pointer-events-none">
+            <div className="text-sm font-bold tracking-[0.5em] uppercase mb-2" style={{ color: BRAND.pink }}>
+              Around the world begins September 1
+            </div>
+            <div className="font-display uppercase leading-none" style={{ fontSize: 'clamp(3rem, 8vw, 6.5rem)', textShadow: '0 2px 30px rgba(0,0,0,0.9)' }}>
+              T-minus {daysToStart} {daysToStart === 1 ? 'day' : 'days'}
+            </div>
+          </div>
+        )}
+
+        {/* Replay badge */}
+        {replaying && (
+          <div className="absolute inset-x-0 top-3 text-center pointer-events-none">
+            <span className="px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-[0.35em]" style={{ background: '#141414ee', border: `1px solid ${BRAND.red}`, color: BRAND.pink }}>
+              Replaying the journey
+            </span>
+          </div>
+        )}
+
+        {/* Top-left: the big number */}
+        <div className="absolute top-4 left-5 pointer-events-none">
+          <div className="text-xs font-bold tracking-[0.35em] uppercase mb-1" style={{ color: BRAND.pink }}>
+            {tvMode ? 'Tulsa Training — World Tour' : 'Around the world'}
+          </div>
+          <div className="font-display leading-none tabular-nums" style={{ fontSize: tvMode ? '5.5rem' : '3.8rem', textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}>
+            {fmt(replaying ? shownTotal : animatedTotal)}
+          </div>
+          <div className="text-zinc-400 text-sm mt-1" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>
+            of <span className="text-white font-bold">{fmt(GOAL)}</span> meters —{' '}
+            <span className="font-black" style={{ color: BRAND.red }}>
+              {pct.toFixed(1)}%
+            </span>
+          </div>
+        </div>
+
+        {/* Top-right: day + pace + projection */}
+        {!replaying && (
+          <div className="absolute top-4 right-5 text-right pointer-events-none">
+            <div className="font-display text-3xl uppercase leading-none" style={{ textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}>
+              {day === 0 ? 'Pre-season' : day <= CHALLENGE_DAYS ? `Day ${day} of ${CHALLENGE_DAYS}` : 'Overtime'}
+            </div>
+            {day > 0 && (
+              <div
+                className="mt-2 inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider"
+                style={{
+                  background: paceDiff >= 0 ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
+                  color: paceDiff >= 0 ? '#10B981' : '#F59E0B',
+                  border: `1px solid ${paceDiff >= 0 ? '#10B98144' : '#F59E0B44'}`,
+                }}
+              >
+                {paceDiff >= 0 ? `${fmtKm(paceDiff)} ahead of pace` : `${fmtKm(-paceDiff)} behind pace`}
+              </div>
+            )}
+            {projected && (
+              <div className="mt-2 text-xs text-zinc-400" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>
+                Projected arrival:{' '}
+                <span className="text-white font-bold">
+                  {projected.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                </span>
+              </div>
+            )}
+            {total >= GOAL && (
+              <div className="mt-2 text-sm font-black uppercase tracking-widest" style={{ color: BRAND.pink }}>
+                Around the world — complete
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Bottom-left: where are we */}
+        <div className="absolute bottom-4 left-5 pointer-events-none">
+          <div className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Current position</div>
+          <div className="text-lg font-bold" style={{ textShadow: '0 1px 10px rgba(0,0,0,0.9)' }}>
+            <span className="pulse-dot inline-block w-2.5 h-2.5 rounded-full mr-2" style={{ background: BRAND.red }} />
+            {loc.where}
+            {loc.toNext > 0 && (
+              <span className="text-zinc-400 font-normal">
+                {' '}
+                — next stop <span className="text-white font-bold">{loc.nextStop}</span> · {fmtKm(loc.toNext)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom-right: counters + actions */}
+        <div className="absolute bottom-4 right-5 text-right">
+          <div className="text-xs text-zinc-500 uppercase tracking-widest mb-1 pointer-events-none">So far that's</div>
+          <div className="text-sm text-zinc-300 pointer-events-none" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>
+            <span className="font-black text-white tabular-nums">{fmt(Math.floor(shownTotal / MARATHON))}</span> marathons ·{' '}
+            <span className="font-black text-white tabular-nums">{fmt(Math.floor(shownTotal / EVEREST))}</span> Everests
+          </div>
+          <div className="mt-2 flex gap-2 justify-end">
+            {yesterdayRow && !replaying && (
+              <button
+                onClick={() => setShowRecap(true)}
+                className="px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider text-zinc-400 hover:text-white transition-colors"
+                style={{ background: '#141414cc', border: '1px solid #2a2a2a' }}
+              >
+                Daily recap
+              </button>
+            )}
+            {total > 0 && (
+              <button
+                onClick={replaying ? stopReplay : startReplay}
+                className="px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider transition-colors"
+                style={
+                  replaying
+                    ? { background: BRAND.red, color: '#fff', border: `1px solid ${BRAND.red}` }
+                    : { background: '#141414cc', border: '1px solid #2a2a2a', color: '#a1a1aa' }
+                }
+              >
+                {replaying ? 'Stop replay' : 'Replay the journey'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {tvMode && (
+          <button
+            onClick={exitTvMode}
+            className="absolute top-4 right-1/2 translate-x-1/2 text-zinc-700 text-xs uppercase tracking-widest hover:text-zinc-400"
+          >
+            exit
+          </button>
+        )}
+      </div>
+
+      {/* ── Journey bar ── */}
+      <div className="max-w-screen-2xl mx-auto px-5 pt-2 pb-1">
+        <div className="relative h-4 rounded-full overflow-visible" style={{ background: '#161616' }}>
+          <div
+            className="absolute left-0 top-0 h-full rounded-full transition-all duration-1000"
+            style={{
+              width: `${pct}%`,
+              background: `linear-gradient(90deg, ${BRAND.darkRed}, ${BRAND.red}, ${BRAND.pink})`,
+              boxShadow: `0 0 14px ${BRAND.red}66`,
+            }}
+          />
+          {/* pace ghost tick */}
+          {day > 0 && !replaying && (
+            <div
+              className="absolute top-[-4px] w-[2px] h-6 bg-white/70"
+              style={{ left: `${Math.min(100, (pace / GOAL) * 100)}%` }}
+              title="On-pace position"
+            />
+          )}
+          {/* city ticks */}
+          {BAR_LABELS.map((c, i) => (
+            <div
+              key={i}
+              className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full"
+              style={{
+                left: `calc(${(c.m / GOAL) * 100}% - 4px)`,
+                background: c.m <= shownTotal ? '#fff' : '#3a3a3a',
+                border: `2px solid ${c.m <= shownTotal ? BRAND.red : '#242424'}`,
+              }}
+            />
+          ))}
+        </div>
+        <div className="relative h-5 mt-1 text-[10px] uppercase tracking-wider text-zinc-500">
+          {BAR_LABELS.map((c, i) => (
+            <span
+              key={i}
+              className="absolute -translate-x-1/2"
+              style={{ left: `${(c.m / GOAL) * 100}%`, color: c.m <= shownTotal ? BRAND.pink : undefined }}
+            >
+              {c.label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Machines + milestone feed ── */}
+      <div className="max-w-screen-2xl mx-auto px-5 py-3 grid grid-cols-1 lg:grid-cols-3 gap-3 pb-6">
+        <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-5 gap-2">
+          {MACHINES.map((m) => {
+            const v = summary.byMachine[m] ?? 0
+            const color = MACHINE_COLORS[m]
+            const share = total > 0 ? ((v / total) * 100).toFixed(1) : '0.0'
+            return (
+              <div
+                key={m}
+                className="rounded-xl p-3"
+                style={{ background: '#0d0d0d', border: '1px solid #1c1c1c', borderTop: `3px solid ${color}` }}
+              >
+                <div className="text-[11px] font-black uppercase tracking-wider mb-1" style={{ color }}>
+                  {m}
+                </div>
+                <div className="text-lg font-black tabular-nums leading-tight">{fmtKm(v)}</div>
+                <div className="text-xs text-zinc-600">{share}% of the trip</div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="rounded-xl p-3" style={{ background: '#0d0d0d', border: '1px solid #1c1c1c' }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs uppercase tracking-widest text-zinc-500">Milestones</span>
+            <span className="text-xs font-bold" style={{ color: BRAND.pink }}>
+              {unlocked.length} / {MILESTONES.length}
+            </span>
+          </div>
+          {nextMilestone && (
+            <div className="flex items-baseline gap-2 mb-2 pb-2" style={{ borderBottom: '1px solid #1c1c1c' }}>
+              <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: BRAND.darkRed, color: BRAND.pink }}>
+                Next
+              </span>
+              <span className="text-sm font-bold truncate">{nextMilestone.name}</span>
+              <span className="text-xs text-zinc-500 ml-auto shrink-0 tabular-nums">{fmtKm(nextMilestone.m - total)} away</span>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            {feed.length === 0 && <div className="text-zinc-600 text-sm">The journey begins with the first entry.</div>}
+            {feed.map((ms) => (
+              <div key={ms.m} className="flex items-baseline gap-2 text-sm group">
+                <span style={{ color: BRAND.red }}>✓</span>
+                <span className={ms.major ? 'font-bold' : 'text-zinc-300'}>{ms.name}</span>
+                <span className="text-zinc-600 text-xs ml-auto shrink-0 tabular-nums">{fmt(ms.m)} m</span>
+                <button
+                  onClick={() => downloadShareCard(ms, day)}
+                  title="Download share card"
+                  className="text-zinc-600 hover:text-white text-xs shrink-0 transition-colors"
+                >
+                  ↓
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Trainer tools ── */}
+      {!tvMode && kiosk && (
+        <div className="max-w-screen-2xl mx-auto px-5 pb-8 space-y-3">
+          <RecentEntries />
+          <DemoTools />
+        </div>
+      )}
+    </div>
+  )
+}
