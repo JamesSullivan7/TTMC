@@ -130,6 +130,19 @@ export const ROUTE: { m: number; name: string; lat: number; lng: number; major?:
   ),
 ]
 
+// Which milestones a jump from `prev` to `next` crosses, and which of those
+// earn a celebration. A single catch-up entry can cross several at once, and
+// showing every one would leave the gym TV stuck in overlays for minutes — so
+// past two, keep the majors plus whichever one we actually landed on.
+export function crossedMilestones(prev: number, next: number): Milestone[] {
+  if (!(next > prev)) return []
+  const crossed = MILESTONES.filter((ms) => ms.m > prev && ms.m <= next)
+  if (crossed.length <= 2) return crossed
+  const majors = crossed.filter((c) => c.major || c.kind === 'finish' || c.kind === 'stretch')
+  const last = crossed[crossed.length - 1]
+  return majors.includes(last) ? majors : [...majors, last]
+}
+
 export const MARATHON = 42_195
 export const EVEREST = 8_848
 

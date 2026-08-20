@@ -51,15 +51,22 @@ export const verifyAdmin = mutation({
 
 // ── Logging ──────────────────────────────────────────────────────────────────
 
-// Deliberately NOT admin-gated: members need to be able to log their own
-// meters from a phone. With no names, no leaderboard and no prizes there is
-// nothing to win by inflating this, and trainers can undo any entry.
+// The plan is a QR code on every machine so members log from their own phone,
+// and that needs logEntry open to anyone. It is NOT open yet, because the site
+// is live at a guessable URL and today only trainers log: an unauthenticated
+// write is pure downside until the thing it exists for actually ships.
+//
+// Flip this to false the day member self-logging goes in. Nothing else needs
+// to change — the client sends the key when it has one either way.
+const REQUIRE_KEY_TO_LOG = true
+
 export const logEntry = mutation({
   // `amount` is the raw number off the machine's screen, in that machine's own
   // unit. Conversion to meters happens here, server-side, so nothing
   // downstream ever has to wonder what unit it is holding.
-  args: { machine: v.string(), amount: v.number() },
-  handler: async (ctx, { machine, amount }) => {
+  args: { machine: v.string(), amount: v.number(), key: v.optional(v.string()) },
+  handler: async (ctx, { machine, amount, key }) => {
+    if (REQUIRE_KEY_TO_LOG) requireAdmin(key ?? '')
     const unit = machineUnit(machine)
     if (unit === null) throw new Error('Unknown machine')
     if (!Number.isFinite(amount) || amount <= 0) {

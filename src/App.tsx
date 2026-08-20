@@ -9,6 +9,7 @@ import { clearAdminKey, getAdminKey, setAdminKey } from './adminKey'
 import {
   ACTS,
   actAt,
+  crossedMilestones,
   GOAL,
   MACHINES,
   MACHINE_COLORS,
@@ -189,14 +190,7 @@ export default function App() {
     }
     const prev = prevTotal.current
     if (total > prev) {
-      let crossed = MILESTONES.filter((ms) => ms.m > prev && ms.m <= total)
-      // A big catch-up entry can cross many milestones at once — celebrate only
-      // the majors plus the most recent one, so the TV isn't stuck in overlays.
-      if (crossed.length > 2) {
-        const majors = crossed.filter((c) => c.major || c.kind === 'finish' || c.kind === 'stretch')
-        const last = crossed[crossed.length - 1]
-        crossed = majors.includes(last) ? majors : [...majors, last]
-      }
+      const crossed = crossedMilestones(prev, total)
       if (crossed.length > 0) setCelebQueue((q) => [...q, ...crossed])
     }
     prevTotal.current = total

@@ -39,7 +39,9 @@ export function EntryForm() {
     setStatus('saving')
     setErrorMsg('')
     try {
-      const res = await logEntry({ machine, amount: n })
+      // Sent whenever this device has one. The server decides whether it is
+      // required — see REQUIRE_KEY_TO_LOG in convex/worldTour.ts.
+      const res = await logEntry({ machine, amount: n, key: getAdminKey() })
       setAmount('')
       setLastLogged(res.journeyMeters)
       setOutcome({
