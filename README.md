@@ -80,3 +80,24 @@ By hand, it is:
 
 - `convex/worldTour.ts` — `MULTIPLIER`. Change requires `npx convex deploy`.
 - `src/config.ts` — `GOAL`, `CHALLENGE_NAME`, `CHALLENGE_WINDOW`, `KIOSK_PIN`, machines, colors, and the full `MILESTONES` list (add/edit landmarks freely; cities need lat/lng). `ROUTE` derives from `MILESTONES`, so swapping the route is a data edit, not a code change.
+
+## Postcards
+
+Each milestone can have a photo behind its celebration, at `public/postcards/<file>.jpg`.
+20 of the 41 are in place; the rest are still to source.
+
+```
+bash scripts/postcards.sh
+```
+
+One stage per missing landmark: it opens a search, gives you the exact filename,
+checks the file is a real JPEG rather than a saved error page, and writes the
+`img:` line into `src/config.ts` for you. Stop with Ctrl-C any time — re-running
+picks up where you left off.
+
+A milestone with no `img` is not broken: `Celebration` confirms the photo loads
+before using it and falls back to the brand treatment otherwise. So a missing
+postcard degrades quietly rather than showing a washed-out overlay over a 404.
+
+`tulsa.jpg` is the finish frame, and it is meant to be a real photo of the gym
+and the crew — nothing else fills that screen at 8,473,348 m.
