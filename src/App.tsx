@@ -7,6 +7,8 @@ import { EntryForm, RecentEntries, DemoTools } from './EntryPanel'
 import { downloadShareCard } from './shareCard'
 import { clearAdminKey, getAdminKey, setAdminKey } from './adminKey'
 import {
+  ACTS,
+  actAt,
   GOAL,
   MACHINES,
   MACHINE_COLORS,
@@ -68,16 +70,16 @@ function useAnimatedNumber(target: number, ms = 1400) {
 
 const BAR_LABELS: { m: number; label: string }[] = [
   { m: 0, label: 'Tulsa' },
-  { m: 2_350_000, label: 'NYC' },
-  { m: 7_600_000, label: 'Dublin' },
-  { m: 11_200_000, label: 'Istanbul' },
-  { m: 14_200_000, label: 'Dubai' },
-  { m: 19_100_000, label: 'Bangkok' },
-  { m: 26_100_000, label: 'Tokyo' },
-  { m: 32_300_000, label: 'Honolulu' },
-  { m: 36_400_000, label: 'LA' },
-  { m: 40_000_000, label: 'Tulsa' },
+  { m: 591_000, label: 'St. Louis' },
+  { m: 2_035_000, label: 'NYC' },
+  { m: 3_179_000, label: 'Chicago' },
+  { m: 4_657_000, label: 'Denver' },
+  { m: 6_205_000, label: 'LA' },
+  { m: 7_924_000, label: 'Amarillo' },
+  { m: 8_473_348, label: 'Tulsa' },
 ]
+
+const ACT_NUMERALS = ['I', 'II', 'III']
 
 function localDayKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -318,6 +320,7 @@ export default function App() {
     }
   }
 
+  const { act, index: actIndex, pct: actPct } = actAt(shownTotal)
   const unlocked = MILESTONES.filter((ms) => ms.m <= total)
   const nextMilestone = MILESTONES.find((ms) => ms.m > total)
   const feed = unlocked.slice(-6).reverse()
@@ -582,6 +585,19 @@ export default function App() {
             exit
           </button>
         )}
+      </div>
+
+      {/* ── Act strip ── the loop is three journeys, and each one ends
+           somewhere that feels like an arrival. ── */}
+      <div className="max-w-screen-2xl mx-auto px-5 pt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-xs font-black uppercase tracking-[0.3em]" style={{ color: BRAND.pink }}>
+          Act {ACT_NUMERALS[actIndex] ?? ''}
+        </span>
+        <span className="font-display text-xl uppercase leading-none">{act.name}</span>
+        <span className="text-xs text-zinc-500">{act.blurb}</span>
+        <span className="ml-auto text-xs text-zinc-400 tabular-nums">
+          {actPct.toFixed(0)}% of act {actIndex + 1} of {ACTS.length}
+        </span>
       </div>
 
       {/* ── Journey bar ── */}

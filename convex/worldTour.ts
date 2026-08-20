@@ -2,10 +2,11 @@ import { mutation, query } from './_generated/server'
 import { v } from 'convex/values'
 import { MACHINE_NAMES, machineUnit, toMeters, unitAbbrev } from './machines'
 
-// Map scale: every real meter moves the journey this many meters.
-// Set to 1 once the route length is chosen — a US route is short enough that
-// the journey can be 1:1 with real meters, so there is no tailwind to hide.
-const MULTIPLIER = 5
+// Map scale. The Tulsa -> New York -> Los Angeles -> Tulsa route is 8,473 km,
+// which the gym covers in ~31 days at its real output — so this is 1, and the
+// old silent x5 tailwind is gone for good. Every meter rowed is a meter of
+// road. Nothing to hide, nothing to explain.
+const MULTIPLIER = 1
 
 // Sanity cap on a single entry. The longest plausible single piece on any of
 // these machines is a half-marathon row (~21,000 m), so 60,000 is generous
