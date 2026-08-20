@@ -124,3 +124,18 @@ A milestone with no `img` is **not** broken. `Celebration` confirms the photo lo
 - `convex/worldTour.ts` — `MULTIPLIER`, the single-entry cap, rate limits. Changes need `npx convex deploy`.
 - `convex/machines.ts` — the machines and their units.
 - `src/config.ts` — `GOAL`, `CHALLENGE_NAME`, `CHALLENGE_WINDOW`, `ACTS`, colours, and the full `MILESTONES` list.
+
+## Checking a live deployment
+
+```
+npm run acceptance -- <ADMIN_KEY> <LOG_TOKEN>
+```
+
+36 checks against the running site and its Convex deployment: that the two key
+tiers genuinely separate, that input validation holds, that the Assault Bike
+converts miles, that neither key leaks into the shipped bundle, and that a burst
+of 30 concurrent logs produces no write conflicts.
+
+It writes a handful of real entries and then resets, so only run it against a
+deployment nobody is mid-challenge on. Recover the keys with
+`npx convex env get ADMIN_KEY --prod`.
