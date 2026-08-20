@@ -3,7 +3,7 @@ import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import { MACHINES, MACHINE_COLORS, BRAND, fmt, Machine, challengeDay } from './config'
 import { machineUnit, toMeters, unitAbbrev, unitLabel } from '../convex/machines'
-import { clearAdminKey, getAdminKey, isAuthError } from './adminKey'
+import { clearAdminKey, getAdminKey, getLogKey, isAuthError } from './adminKey'
 import LogResult, { LogOutcome } from './LogResult'
 
 // Anything past this (in real meters) asks for confirmation before logging.
@@ -39,9 +39,9 @@ export function EntryForm() {
     setStatus('saving')
     setErrorMsg('')
     try {
-      // Sent whenever this device has one. The server decides whether it is
-      // required — see REQUIRE_KEY_TO_LOG in convex/worldTour.ts.
-      const res = await logEntry({ machine, amount: n, key: getAdminKey() })
+      // The admin key on the gym computer, the log token on a member's phone.
+      // The server accepts either — see requireLogAccess in worldTour.ts.
+      const res = await logEntry({ machine, amount: n, key: getLogKey() })
       setAmount('')
       setLastLogged(res.journeyMeters)
       setOutcome({

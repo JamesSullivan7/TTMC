@@ -49,16 +49,52 @@ export const verifyAdmin = mutation({
   },
 })
 
+// The QR codes carry the log token, so a trainer needs to see it to print
+// them. Admin-gated: this is the one place the token is ever handed to a
+// client, and only to a device that already proved it has the trainer key.
+export const getLogToken = query({
+  args: { key: v.string() },
+  handler: async (_ctx, { key }) => {
+    requireAdmin(key)
+    return process.env.LOG_TOKEN ?? null
+  },
+})
+
 // ── Logging ──────────────────────────────────────────────────────────────────
 
-// The plan is a QR code on every machine so members log from their own phone,
-// and that needs logEntry open to anyone. It is NOT open yet, because the site
-// is live at a guessable URL and today only trainers log: an unauthenticated
-// write is pure downside until the thing it exists for actually ships.
+// Members log from their own phones by scanning a QR code on the machine, so
+// logging cannot require the trainer key. It is still not open to the world:
+// the QR carries a separate LOG_TOKEN, which — unlike anything in the bundle —
+// you cannot get by reading the site's source. You have to have stood in the
+// gym and pointed a camera at a machine.
 //
-// Flip this to false the day member self-logging goes in. Nothing else needs
-// to change — the client sends the key when it has one either way.
-const REQUIRE_KEY_TO_LOG = true
+// That is a deliberately modest bar. It is not protecting money, it is
+// stopping a stranger who guessed the URL from spraying the total. A trainer's
+// admin key is accepted too, so the gym computer keeps working unchanged.
+//
+//   npx convex env set LOG_TOKEN <value> --prod
+//
+function requireLogAccess(key: string) {
+  const admin = process.env.ADMIN_KEY
+  const logToken = process.env.LOG_TOKEN
+  if (admin && key === admin) return
+  if (logToken && key === logToken) return
+  throw new Error('Not authorized')
+}
+
+// A blunt gym-wide throttle. Real bursts happen — a class of twenty finishing
+// at once is normal — so this sits well above that and only catches a script.
+const RATE_LIMIT_MAX = 40
+const RATE_LIMIT_WINDOW_MS = 60_000
+
+async function checkRateLimit(ctx: { db: any }) {
+  const recent = await ctx.db.query('entries').order('desc').take(RATE_LIMIT_MAX)
+  if (recent.length < RATE_LIMIT_MAX) return
+  const oldest = recent[recent.length - 1]
+  if (Date.now() - oldest._creationTime < RATE_LIMIT_WINDOW_MS) {
+    throw new Error('Too many entries at once — give it a minute')
+  }
+}
 
 export const logEntry = mutation({
   // `amount` is the raw number off the machine's screen, in that machine's own
@@ -66,7 +102,8 @@ export const logEntry = mutation({
   // downstream ever has to wonder what unit it is holding.
   args: { machine: v.string(), amount: v.number(), key: v.optional(v.string()) },
   handler: async (ctx, { machine, amount, key }) => {
-    if (REQUIRE_KEY_TO_LOG) requireAdmin(key ?? '')
+    requireLogAccess(key ?? '')
+    await checkRateLimit(ctx)
     const unit = machineUnit(machine)
     if (unit === null) throw new Error('Unknown machine')
     if (!Number.isFinite(amount) || amount <= 0) {
