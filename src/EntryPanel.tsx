@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import { MACHINES, MACHINE_COLORS, BRAND, fmt, Machine } from './config'
+import { clearAdminKey, getAdminKey, isAuthError } from './adminKey'
 
 export function EntryForm() {
   const logEntry = useMutation(api.worldTour.logEntry)
@@ -93,6 +94,13 @@ export function DemoTools() {
     setBusy(true)
     try {
       await fn()
+    } catch (err) {
+      window.alert(
+        isAuthError(err)
+          ? 'That trainer key is no longer valid — lock and log in again.'
+          : 'That did not go through. Try again.'
+      )
+      if (isAuthError(err)) clearAdminKey()
     } finally {
       setBusy(false)
     }
@@ -103,7 +111,7 @@ export function DemoTools() {
       <span className="text-zinc-600 uppercase tracking-widest">Testing tools</span>
       <button
         disabled={busy}
-        onClick={() => run(() => simulateDay({}))}
+        onClick={() => run(() => simulateDay({ key: getAdminKey() }))}
         className="px-3 py-1.5 rounded-lg font-bold uppercase tracking-wider text-zinc-300 hover:text-white transition-colors disabled:opacity-40"
         style={{ background: '#141414', border: '1px solid #2a2a2a' }}
       >
@@ -112,7 +120,10 @@ export function DemoTools() {
       <button
         disabled={busy}
         onClick={() =>
-          run(() => resetChallenge({}), 'Wipe ALL entries and reset the challenge to zero?')
+          run(
+            () => resetChallenge({ key: getAdminKey() }),
+            'Wipe ALL entries and reset the challenge to zero?'
+          )
         }
         className="px-3 py-1.5 rounded-lg font-bold uppercase tracking-wider text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-40"
         style={{ background: '#141414', border: '1px solid #2a2a2a' }}
@@ -146,7 +157,7 @@ export function RecentEntries() {
               {new Date(e.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
             </span>
             <button
-              onClick={() => deleteEntry({ id: e.id })}
+              onClick={() => deleteEntry({ id: e.id, key: getAdminKey() })}
               className="text-zinc-600 hover:text-red-400 px-1"
               title="Undo this entry"
             >

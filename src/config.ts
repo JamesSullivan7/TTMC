@@ -13,9 +13,6 @@ export const CHALLENGE_NAME = 'Cross Country'
 // decided and all of that lights back up on its own.
 export const CHALLENGE_WINDOW: { start: Date; days: number } | null = null
 
-// PIN that unlocks trainer (kiosk) mode on a device.
-export const KIOSK_PIN = '6426'
-
 export const MACHINES = ['Row', 'Ski', 'Erg Bike', 'Assault Bike', 'Assault Runner'] as const
 export type Machine = (typeof MACHINES)[number]
 

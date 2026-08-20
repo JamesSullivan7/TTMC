@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { useQuery } from 'convex/react'
+import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import GlobeView from './GlobeView'
 import Celebration from './Celebration'
 import { EntryForm, RecentEntries, DemoTools } from './EntryPanel'
 import { downloadShareCard } from './shareCard'
+import { clearAdminKey, getAdminKey, setAdminKey } from './adminKey'
 import {
   GOAL,
-  KIOSK_PIN,
   MACHINES,
   MACHINE_COLORS,
   MILESTONES,
@@ -155,9 +155,12 @@ function RecapOverlay({
 
 export default function App() {
   const summary = useQuery(api.worldTour.getSummary)
+  const verifyAdmin = useMutation(api.worldTour.verifyAdmin)
   const daily = useQuery(api.worldTour.getDaily)
   const [tvMode, setTvMode] = useState(false)
-  const [kiosk, setKiosk] = useState(() => localStorage.getItem('tt-kiosk') === '1')
+  const [kiosk, setKiosk] = useState(
+    () => localStorage.getItem('tt-kiosk') === '1' && getAdminKey() !== ''
+  )
   const [celebQueue, setCelebQueue] = useState<Milestone[]>([])
   const [flyToSignal, setFlyToSignal] = useState(0)
   const [showRecap, setShowRecap] = useState(false)
@@ -235,16 +238,23 @@ export default function App() {
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
   }
 
-  function trainerLogin() {
-    const pin = window.prompt('Trainer PIN:')
-    if (pin === KIOSK_PIN) {
+  // The key is checked by the server, not compared against a bundled constant,
+  // so a wrong key cannot be discovered by reading the site's source.
+  async function trainerLogin() {
+    const entered = window.prompt('Trainer key:')
+    if (entered === null) return
+    const key = entered.trim()
+    try {
+      await verifyAdmin({ key })
+      setAdminKey(key)
       localStorage.setItem('tt-kiosk', '1')
       setKiosk(true)
-    } else if (pin !== null) {
-      window.alert('Wrong PIN')
+    } catch {
+      window.alert('That key was not accepted.')
     }
   }
   function trainerLock() {
+    clearAdminKey()
     localStorage.removeItem('tt-kiosk')
     setKiosk(false)
   }

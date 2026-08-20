@@ -8,6 +8,11 @@ const MULTIPLIER = 5
 
 const MACHINES = ['Row', 'Ski', 'Erg Bike', 'Assault Bike', 'Assault Runner']
 
+// Sanity cap on a single entry. The longest plausible single piece on any of
+// these machines is a half-marathon row (~21,000 m), so 60,000 is generous
+// while still catching a fat-fingered extra zero.
+const MAX_SINGLE_ENTRY = 60_000
+
 // Tulsa is UTC-5 (CDT) — used only to bucket entries into local gym days.
 const TZ_OFFSET_MS = 5 * 3600 * 1000
 
@@ -15,31 +20,77 @@ function dayKey(creationTime: number): string {
   return new Date(creationTime - TZ_OFFSET_MS).toISOString().slice(0, 10)
 }
 
+// ── Authorization ────────────────────────────────────────────────────────────
+//
+// This app has no user accounts by design (no names, no leaderboard), and the
+// Convex deployment URL ships inside the client bundle — so anything callable
+// is callable by anyone who opens the site. Destructive operations therefore
+// check a shared key that lives ONLY in the deployment's environment and is
+// typed in by a trainer on demand. It is never bundled, never committed.
+//
+//   npx convex env set ADMIN_KEY <value>          (dev)
+//   npx convex env set ADMIN_KEY <value> --prod   (production)
+//
+function requireAdmin(key: string) {
+  const expected = process.env.ADMIN_KEY
+  if (!expected) {
+    throw new Error('ADMIN_KEY is not set on this deployment — run: npx convex env set ADMIN_KEY <value>')
+  }
+  if (key !== expected) throw new Error('Not authorized')
+}
+
+// Trainer login: succeeds or throws. The client stores the key on success so
+// trainers only type it once per device.
+export const verifyAdmin = mutation({
+  args: { key: v.string() },
+  handler: async (_ctx, { key }) => {
+    requireAdmin(key)
+    return true
+  },
+})
+
+// ── Logging ──────────────────────────────────────────────────────────────────
+
+// Deliberately NOT admin-gated: members need to be able to log their own
+// meters from a phone. With no names, no leaderboard and no prizes there is
+// nothing to win by inflating this, and trainers can undo any entry.
 export const logEntry = mutation({
   args: { machine: v.string(), meters: v.number() },
   handler: async (ctx, { machine, meters }) => {
     if (!MACHINES.includes(machine)) throw new Error('Unknown machine')
-    if (!(meters > 0 && meters <= 1_000_000)) throw new Error('Max single entry is 1,000,000 meters')
+    if (!Number.isFinite(meters) || meters <= 0) throw new Error('Meters must be a positive number')
+    if (meters > MAX_SINGLE_ENTRY) {
+      throw new Error(`Max single entry is ${MAX_SINGLE_ENTRY.toLocaleString('en-US')} meters`)
+    }
+
+    // Total before and after, so the logger can be told exactly which stretch
+    // of road their meters covered.
+    const existing = await ctx.db.query('entries').collect()
+    const totalBefore = existing.reduce((s, e) => s + e.journeyMeters, 0)
+
     const journeyMeters = Math.round(meters * MULTIPLIER)
     await ctx.db.insert('entries', { machine, meters: Math.round(meters), journeyMeters })
-    return { journeyMeters }
+
+    return { journeyMeters, totalBefore, totalAfter: totalBefore + journeyMeters }
   },
 })
 
 export const deleteEntry = mutation({
-  args: { id: v.id('entries') },
-  handler: async (ctx, { id }) => {
+  args: { id: v.id('entries'), key: v.string() },
+  handler: async (ctx, { id, key }) => {
+    requireAdmin(key)
     await ctx.db.delete(id)
   },
 })
 
-// ── Testing tools (used from the dashboard's demo bar) ──────────────────────
+// ── Testing tools (used from the dashboard's trainer bar) ───────────────────
 
 // Inserts a realistic day of gym entries (~80 entries) using the machine mix
 // observed in the calorie challenge: ~273,000 real meters per gym day.
 export const simulateDay = mutation({
-  args: {},
-  handler: async (ctx) => {
+  args: { key: v.string() },
+  handler: async (ctx, { key }) => {
+    requireAdmin(key)
     const MIX: { machine: string; weight: number; avg: number }[] = [
       { machine: 'Assault Runner', weight: 30, avg: 1800 },
       { machine: 'Erg Bike', weight: 28, avg: 6000 },
@@ -70,8 +121,9 @@ export const simulateDay = mutation({
 
 // Wipes every entry — resets the challenge to zero.
 export const resetChallenge = mutation({
-  args: {},
-  handler: async (ctx) => {
+  args: { key: v.string() },
+  handler: async (ctx, { key }) => {
+    requireAdmin(key)
     const entries = await ctx.db.query('entries').collect()
     for (const e of entries) await ctx.db.delete(e._id)
     return { deleted: entries.length }
@@ -79,6 +131,8 @@ export const resetChallenge = mutation({
 })
 
 // ── Queries ──────────────────────────────────────────────────────────────────
+//
+// Queries stay open: everything they expose is already on the gym TV.
 
 export const getSummary = query({
   args: {},
@@ -113,7 +167,8 @@ export const getRecent = query({
   },
 })
 
-// Journey meters per local (Tulsa) day, oldest first — feeds the daily recap.
+// Journey meters per local (Tulsa) day, oldest first — feeds the daily recap
+// and the "today vs. our best day" readout.
 export const getDaily = query({
   args: {},
   handler: async (ctx) => {
