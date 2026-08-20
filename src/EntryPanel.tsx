@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
-import { MACHINES, MACHINE_COLORS, BRAND, fmt, Machine } from './config'
+import { MACHINES, MACHINE_COLORS, BRAND, fmt, Machine, challengeDay } from './config'
+import LogResult, { LogOutcome } from './LogResult'
 import { clearAdminKey, getAdminKey, isAuthError } from './adminKey'
 
 export function EntryForm() {
@@ -11,6 +12,7 @@ export function EntryForm() {
   const [status, setStatus] = useState<'idle' | 'saving' | 'done'>('idle')
   const [lastLogged, setLastLogged] = useState<number | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [outcome, setOutcome] = useState<LogOutcome | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -23,6 +25,7 @@ export function EntryForm() {
       const res = await logEntry({ machine, meters: n })
       setMeters('')
       setLastLogged(res.journeyMeters)
+      setOutcome({ meters: n, ...res })
       setStatus('done')
       setTimeout(() => {
         setStatus('idle')
@@ -37,7 +40,8 @@ export function EntryForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-wrap gap-2 items-end">
+    <>
+      <form onSubmit={handleSubmit} className="flex flex-wrap gap-2 items-end">
       <div>
         <label className="block text-zinc-500 text-xs mb-1 uppercase tracking-wider">Machine</label>
         <select
@@ -80,7 +84,11 @@ export function EntryForm() {
           {errorMsg}
         </span>
       )}
-    </form>
+      </form>
+      {outcome && (
+        <LogResult outcome={outcome} day={challengeDay()} onDone={() => setOutcome(null)} />
+      )}
+    </>
   )
 }
 

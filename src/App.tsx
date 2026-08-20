@@ -211,6 +211,15 @@ export default function App() {
   const cumBeforeYesterday = (daily ?? [])
     .filter((d) => d.key < yesterdayKey)
     .reduce((s, d) => s + d.journey, 0)
+
+  // Today measured against the gym's own best day. With no deadline this is
+  // the only urgency left, and it is collective — nobody is ranked against
+  // anybody, the room is racing its own history.
+  const todayMeters = daily?.find((d) => d.key === todayKey)?.journey ?? 0
+  const bestPreviousDay = (daily ?? [])
+    .filter((d) => d.key !== todayKey)
+    .reduce((best, d) => Math.max(best, d.journey), 0)
+  const beatingBest = todayMeters > 0 && bestPreviousDay > 0 && todayMeters > bestPreviousDay
   useEffect(() => {
     if (!yesterdayRow || replaying) return
     const hour = now.getHours()
@@ -452,6 +461,31 @@ export default function App() {
                     : 'Overtime'}
               </div>
             )}
+            {todayMeters > 0 && (
+              <div className={CHALLENGE_WINDOW ? 'mt-2' : ''}>
+                <div className="text-xs uppercase tracking-widest" style={{ color: BRAND.pink }}>
+                  Today
+                </div>
+                <div
+                  className="font-display uppercase leading-none tabular-nums"
+                  style={{ fontSize: tvMode ? '3rem' : '2.2rem', textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}
+                >
+                  {fmt(todayMeters)}
+                </div>
+                {bestPreviousDay > 0 && (
+                  <div
+                    className="mt-1 inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider"
+                    style={
+                      beatingBest
+                        ? { background: 'rgba(16,185,129,0.15)', color: '#10B981', border: '1px solid #10B98144' }
+                        : { background: '#141414cc', color: '#a1a1aa', border: '1px solid #2a2a2a' }
+                    }
+                  >
+                    {beatingBest ? 'Best day yet' : `${fmtKm(bestPreviousDay - todayMeters)} off our best`}
+                  </div>
+                )}
+              </div>
+            )}
             {paceDiff !== null && day > 0 && (
               <div
                 className="mt-2 inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider"
@@ -480,19 +514,31 @@ export default function App() {
           </div>
         )}
 
-        {/* Bottom-left: where are we */}
+        {/* Bottom-left: where we are, and — much bigger — what we are chasing.
+            "4,000 meters to Santa Fe" is the one number a trainer can turn into
+            an ask on the gym floor, so it gets the weight. */}
         <div className="absolute bottom-4 left-5 pointer-events-none">
           <div className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Current position</div>
-          <div className="text-lg font-bold" style={{ textShadow: '0 1px 10px rgba(0,0,0,0.9)' }}>
+          <div className="text-base font-bold" style={{ textShadow: '0 1px 10px rgba(0,0,0,0.9)' }}>
             <span className="pulse-dot inline-block w-2.5 h-2.5 rounded-full mr-2" style={{ background: BRAND.red }} />
             {loc.where}
-            {loc.toNext > 0 && (
-              <span className="text-zinc-400 font-normal">
-                {' '}
-                — next stop <span className="text-white font-bold">{loc.nextStop}</span> · {fmtKm(loc.toNext)}
-              </span>
-            )}
           </div>
+          {loc.toNext > 0 && (
+            <div className="mt-3">
+              <div className="text-xs uppercase tracking-widest mb-0.5" style={{ color: BRAND.pink }}>
+                Next stop
+              </div>
+              <div
+                className="font-display uppercase leading-none"
+                style={{ fontSize: tvMode ? '3.2rem' : '2.2rem', textShadow: '0 2px 20px rgba(0,0,0,0.9)' }}
+              >
+                {loc.nextStop}
+              </div>
+              <div className="text-sm font-bold text-zinc-300 mt-1" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>
+                <span className="tabular-nums text-white">{fmtKm(loc.toNext)}</span> to go
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Bottom-right: counters + actions */}
