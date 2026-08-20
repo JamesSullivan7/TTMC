@@ -11,6 +11,9 @@ const BIG_ENTRY_METERS = 30_000
 
 export function EntryForm() {
   const logEntry = useMutation(api.worldTour.logEntry)
+  // The running total comes from this live subscription rather than from the
+  // mutation, which no longer reads it — see the note in convex/worldTour.ts.
+  const summary = useQuery(api.worldTour.getSummary)
   const [machine, setMachine] = useState<string>('')
   const [amount, setAmount] = useState('')
   const [status, setStatus] = useState<'idle' | 'saving' | 'done'>('idle')
@@ -38,6 +41,7 @@ export function EntryForm() {
 
     setStatus('saving')
     setErrorMsg('')
+    const before = summary?.totalJourney ?? 0
     try {
       // The admin key on the gym computer, the log token on a member's phone.
       // The server accepts either — see requireLogAccess in worldTour.ts.
@@ -47,8 +51,8 @@ export function EntryForm() {
       setOutcome({
         meters: res.meters,
         journeyMeters: res.journeyMeters,
-        totalBefore: res.totalBefore,
-        totalAfter: res.totalAfter,
+        totalBefore: before,
+        totalAfter: before + res.journeyMeters,
       })
       setStatus('done')
       setTimeout(() => {

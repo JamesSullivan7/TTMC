@@ -73,14 +73,18 @@ export default function LogPage() {
     if (!machine || !n || n <= 0 || unit === null || busy) return
     setBusy(true)
     setError('')
+    // Taken from the live subscription, not returned by the mutation — which
+    // no longer reads the total, so that concurrent logs cannot conflict.
+    const before = summary?.totalJourney ?? 0
     try {
       const res = await logEntry({ machine, amount: n, key: getLogKey() })
+      const after = before + res.journeyMeters
       setOutcome({
         meters: res.meters,
         journeyMeters: res.journeyMeters,
-        totalBefore: res.totalBefore,
-        totalAfter: res.totalAfter,
-        crossed: crossedMilestones(res.totalBefore, res.totalAfter),
+        totalBefore: before,
+        totalAfter: after,
+        crossed: crossedMilestones(before, after),
       })
       setAmount('')
     } catch (err: any) {

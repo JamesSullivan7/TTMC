@@ -14,4 +14,13 @@ export default defineSchema({
     input: v.optional(v.number()),
     unit: v.optional(v.string()),
   }),
+
+  // Rate limiting, deliberately spread over several rows. A limiter that read
+  // recent `entries` would put those rows into every writer's read set — which
+  // is exactly the contention it is supposed to help the gym survive.
+  rateLimit: defineTable({
+    shard: v.number(),
+    windowStart: v.number(),
+    count: v.number(),
+  }).index('by_shard', ['shard']),
 })

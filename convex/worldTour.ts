@@ -82,18 +82,41 @@ function requireLogAccess(key: string) {
   throw new Error('Not authorized')
 }
 
-// A blunt gym-wide throttle. Real bursts happen — a class of twenty finishing
-// at once is normal — so this sits well above that and only catches a script.
-const RATE_LIMIT_MAX = 40
-const RATE_LIMIT_WINDOW_MS = 60_000
+// A throttle against a runaway client or a bored member with a script — not
+// the main defence, which is the token gate plus the fact that a trainer can
+// undo anything. So it is set well above any real burst: a class of thirty
+// finishing together must never be told to wait.
+//
+// Sharded because the obvious implementation — read the most recent N entries
+// and check their timestamps — puts those rows in every writer's read set, and
+// concurrent inserts then invalidate it. That is the precise cause of the
+// OptimisticConcurrencyControlFailure this exists alongside. Here each writer
+// touches exactly one row, so two people logging in the same instant only
+// collide if they happen to land on the same shard.
+const RATE_SHARDS = 8
+const PER_SHARD_PER_MINUTE = 20 // 160/min across the gym
+const RATE_WINDOW_MS = 60_000
 
 async function checkRateLimit(ctx: { db: any }) {
-  const recent = await ctx.db.query('entries').order('desc').take(RATE_LIMIT_MAX)
-  if (recent.length < RATE_LIMIT_MAX) return
-  const oldest = recent[recent.length - 1]
-  if (Date.now() - oldest._creationTime < RATE_LIMIT_WINDOW_MS) {
+  const shard = Math.floor(Math.random() * RATE_SHARDS)
+  const now = Date.now()
+  const row = await ctx.db
+    .query('rateLimit')
+    .withIndex('by_shard', (q: any) => q.eq('shard', shard))
+    .unique()
+
+  if (!row) {
+    await ctx.db.insert('rateLimit', { shard, windowStart: now, count: 1 })
+    return
+  }
+  if (now - row.windowStart >= RATE_WINDOW_MS) {
+    await ctx.db.patch(row._id, { windowStart: now, count: 1 })
+    return
+  }
+  if (row.count >= PER_SHARD_PER_MINUTE) {
     throw new Error('Too many entries at once — give it a minute')
   }
+  await ctx.db.patch(row._id, { count: row.count + 1 })
 }
 
 export const logEntry = mutation({
@@ -118,11 +141,16 @@ export const logEntry = mutation({
       )
     }
 
-    // Total before and after, so the logger can be told exactly which stretch
-    // of road their meters covered.
-    const existing = await ctx.db.query('entries').collect()
-    const totalBefore = existing.reduce((s, e) => s + e.journeyMeters, 0)
-
+    // This deliberately does NOT read the running total, even though the
+    // "which stretch of road did I move us along" message needs it. Reading
+    // the entries table here put every existing row in the read set, so any
+    // two people logging at the same moment invalidated each other — measured
+    // at roughly 14% of writes failing with OptimisticConcurrencyControlFailure
+    // when 35 logged at once, which is an ordinary end-of-class burst.
+    //
+    // The client already subscribes to the total and computes the message from
+    // it. If someone else's entry lands in the same instant, the message shifts
+    // by their meters and nobody can tell. A failed write, they notice.
     const journeyMeters = Math.round(meters * MULTIPLIER)
     await ctx.db.insert('entries', {
       machine,
@@ -132,7 +160,7 @@ export const logEntry = mutation({
       unit,
     })
 
-    return { journeyMeters, meters: Math.round(meters), totalBefore, totalAfter: totalBefore + journeyMeters }
+    return { journeyMeters, meters: Math.round(meters) }
   },
 })
 
