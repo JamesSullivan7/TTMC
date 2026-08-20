@@ -1,38 +1,61 @@
 # Tulsa Training — Cross Country
 
-A collective gym challenge: the whole gym covers one long route together, cardio meter by cardio meter. No names, no leaderboard — one gym, one road, a run of landmarks from Tulsa and back.
+A collective gym challenge. The whole gym drives one route together, cardio meter by cardio meter: **Tulsa → New York → Los Angeles → Tulsa, 8,473,348 meters.** No names, no leaderboard — one gym, one road.
 
-> **Status: mid-pivot.** This started as an around-the-world challenge (40,000,000 m, eastbound, 3D globe). It is being reworked into a US cross-country route. See "Open decisions" below — the milestone list, goal, and map view are all still the old around-the-world data.
+**Live:** https://tt-cross-country.vercel.app
+
+Every meter someone rows is a meter of road. There is no map scale and nothing hidden — see [Sizing](#sizing-the-route) for why that works out.
+
+## Three surfaces
+
+| URL | Who | What |
+|---|---|---|
+| `/` | the gym TV, and anyone watching | the map, the milestone feed, per-machine totals |
+| `/log` | a member's phone | log your own meters, reached by scanning a machine's QR |
+| `/qr` | a trainer, once | print the QR cards to tape on the machines |
+
+There is no router library — `src/main.tsx` checks the path. `vercel.json` rewrites everything to `index.html` so those survive a refresh.
 
 ## How it works
 
-- The site opens in **member view**: watch-only, no logging. Anyone can open it on their phone.
-- **Trainer login** (PIN in `src/config.ts`, currently `6426`) unlocks the entry form, recent-entries undo, and testing tools on that device. "Lock" returns it to member view.
-- Trainers log cardio meters: pick the machine, type the meters off the screen, hit **Log it**.
-- Every real meter moves the journey `MULTIPLIER` meters, applied server-side in `convex/worldTour.ts`.
-- The dashboard shows a US map with the route drawn across it — the road behind you in brand red, the road ahead dashed — the logo riding the current position, plus the milestone feed and per-machine totals.
-- Crossing a landmark fires a celebration automatically — with a postcard backdrop if a photo exists at the milestone's `img` path (drop JPGs into `public/postcards/`), and a **Save share card** button that downloads a 1080×1080 branded image for Instagram. Share cards can also be downloaded anytime via the ↓ next to each unlocked milestone.
-- **Daily recap**: each morning the display opens with yesterday's numbers; also available on demand.
-- **Replay the journey**: animates the whole trip from the start to the current position in ~50 seconds — built for the finish party.
-- **TV mode** button: fullscreen display for the gym TV (double-click the map or press the small "exit" label to leave).
+- The site opens in **member view**: watch-only. Anyone can open it on their phone.
+- **Members log their own meters** by scanning the QR on a machine. That opens `/log` with the machine already picked, and hands them the moment afterwards: *"You just moved us 10,300 meters down the road — 10 km closer to Joplin."* One person's meters are 0.02% of the goal, but they are always a nameable piece of road.
+- **Trainer login** unlocks the entry form on the gym computer, plus recent-entries undo and the testing tools. Trainers can log for anyone who will not use a phone.
+- The dashboard shows a US map with the route drawn across it — road behind you in brand red, road ahead dashed — the logo riding the current position.
+- Crossing a landmark fires a celebration, with a postcard backdrop if one exists, and a **Save share card** button that downloads a 1080×1080 branded image for Instagram.
+- **Today vs. our best day** replaces a deadline as the source of urgency. The room races its own history, which is the point of having no leaderboard.
+- **Daily recap** each morning, **Replay the journey** (~50s, built for the finish party), and **TV mode** for the gym screen.
 
-The map is a static SVG (d3-geo `albersUsa` + `us-atlas` state shapes) in a fixed 975x610 viewBox that scales to any screen. No WebGL, no camera, no render loop, no network — it is meant to sit on a TV for a month without anyone touching it.
+The map is a static SVG (`d3-geo` `albersUsa` + `us-atlas` state shapes) that scales to any screen. No WebGL, no camera, no render loop, no network call — it has to sit on a TV for a month unattended.
 
-### Dates are optional
+## Keys
 
-`CHALLENGE_WINDOW` in `src/config.ts` is currently `null`, which means the challenge is **open-ended** — it runs until the route is finished. In that mode the app hides the T-minus countdown, the "Day N of N" counter, the pace ghost, the ahead/behind-pace badge, and the "day N" line on share cards.
+Two tiers, both living only in the Convex deployment environment. Neither is ever in the bundle or the repo.
 
-Set it to `{ start: new Date('...'), days: N }` and every one of those turns back on by itself. Nothing else needs touching.
+| | `LOG_TOKEN` | `ADMIN_KEY` |
+|---|---|---|
+| who has it | any member who scanned a QR | trainers |
+| log meters | ✅ | ✅ |
+| undo / reset / simulate | ❌ | ✅ |
+| read the log token back | ❌ | ✅ |
 
-## Open decisions
+```
+npx convex env set ADMIN_KEY <value> --prod
+npx convex env set LOG_TOKEN <value> --prod
+npx convex env get ADMIN_KEY --prod        # recover one
+```
 
-These block the rest of the rebuild:
+`LOG_TOKEN` rides in the QR URL, so you cannot get it by reading the site's source — you have to have stood in the gym and pointed a camera at a machine. It is a deliberately modest bar: it is not protecting money, it is stopping a stranger who guessed the URL from spraying the total. A leaked QR costs you some junk entries, not the month.
 
-1. **The route.** Leaning Tulsa → both coasts → home. Route length and `MULTIPLIER` are the *same decision* — see below.
-2. **Participation and machines.** The calibration assumes ~182 athletes on the current 5 machines. Both need confirming.
-3. **The name.** `CHALLENGE_NAME` in `src/config.ts` is a placeholder (`'Cross Country'`). One line to change; it drives the header, TV title, completion copy, and share cards.
+`/log` stores the token then strips it from the address bar, so a screenshot does not leak it.
 
-### Sizing the route
+## Machines and units
+
+The **Assault Bike reads in miles**; everything else reads in meters. The unit is part of the machine definition in `convex/machines.ts`, shared by the server and the UI, and conversion happens server-side — so nothing downstream ever holds a number whose unit is ambiguous. The form follows the machine: the label switches to Miles, decimals are allowed, and a live line shows `6.4 mi = 10,300 meters` before you commit.
+
+Adding or changing a machine is one entry in that file.
+
+## Sizing the route
 
 The gym's output is the fixed input, not the route. From the calorie challenge (182 athletes) and the machine mix in `simulateDay`:
 
@@ -40,9 +63,17 @@ The gym's output is the fixed input, not the route. From the calorie challenge (
 |---|---|
 | Expected real meters per entry | 3,414 |
 | Expected **real** meters per gym day | ~273,000 |
-| Expected **real** meters over 30 days | ~8,200,000 |
+| **This route** | 8,473,348 m = **31.0 gym days at `MULTIPLIER = 1`** |
 
-So `route length ÷ MULTIPLIER ≈ 8,200,000` for a 30-day finish. A US route of ~8,000–9,000 km lands at `MULTIPLIER = 1` — meaning the map scale disappears entirely and every meter rowed is a real meter down the road.
+Route length and `MULTIPLIER` are one decision, not two. This route is short enough that the journey is 1:1 with real meters, which is why the old silent ×5 "tailwind" is gone.
+
+41 milestones, averaging one every 0.76 gym days, with no gap larger than 1.70 — so no day the gym is open passes without something happening.
+
+### Dates are optional
+
+`CHALLENGE_WINDOW` in `src/config.ts` is `null`, so the challenge is **open-ended** — it runs until the route is finished. In that mode the app hides the countdown, the "Day N of N" counter, the pace ghost, the ahead/behind-pace badge, and the day line on share cards.
+
+Set it to `{ start: new Date('...'), days: N }` and every one of those turns back on by itself. Nothing else needs touching.
 
 ## Running it
 
@@ -50,54 +81,46 @@ So `route length ÷ MULTIPLIER ≈ 8,200,000` for a 30-day finish. A US route of
 npm install
 npx convex dev --once   # syncs backend functions (first time on a new machine)
 npm run dev             # local dev server
+npm test                # 28 tests over the route data, geometry and units
 ```
 
-Backend: Convex deployment `tt-world-tour` (team james-7ecd5, dev deployment fine-eagle-220). The URL lives in `.env.local`.
+Backend: Convex project `tt-world-tour` (team `james-7ecd5`). Dev deployment `fine-eagle-220`, production `utmost-gopher-81`. URLs live in `.env.local`.
 
 ## Deploying
 
-First time, run the wizard — it does all of the below, generates the production
-trainer key, and proves the destructive mutations are actually locked down
-before it hands you the URL:
+Production is live. Vercel is connected to the GitHub repo, so merging to `main` deploys.
+
+For a fresh environment, the wizard does the whole thing — including generating the keys and proving on the live deployment that the destructive mutations are actually locked down before it hands you a URL:
 
 ```
 bash scripts/first-deploy.sh
 ```
 
-It is safe to re-run; it offers to keep the existing production key rather than
-rotating it out from under the trainers' devices.
-
-By hand, it is:
-
-1. `npx convex deploy` — pushes functions to the production Convex deployment.
-2. `npx convex env set ADMIN_KEY <value> --prod` — production needs its own key.
-3. Deploy to Vercel with `VITE_CONVEX_URL` set to the **production** Convex URL.
-4. Open the site on the gym computer, hit TV mode on the TV browser window.
-
-**Not yet done.** There is no Vercel project and no Convex production deployment. Also note every Convex mutation is currently unauthenticated — including `resetChallenge`, which wipes the challenge — and `VITE_CONVEX_URL` ships in the client bundle. That needs locking down before this goes on a public URL.
-
-## Tuning knobs
-
-- `convex/worldTour.ts` — `MULTIPLIER`. Change requires `npx convex deploy`.
-- `src/config.ts` — `GOAL`, `CHALLENGE_NAME`, `CHALLENGE_WINDOW`, `KIOSK_PIN`, machines, colors, and the full `MILESTONES` list (add/edit landmarks freely; cities need lat/lng). `ROUTE` derives from `MILESTONES`, so swapping the route is a data edit, not a code change.
+By hand: `npx convex deploy`, set both keys with `npx convex env set ... --prod`, then deploy to Vercel with `VITE_CONVEX_URL` pointing at the **production** Convex URL.
 
 ## Postcards
 
-Each milestone can have a photo behind its celebration, at `public/postcards/<file>.jpg`.
-20 of the 41 are in place; the rest are still to source.
+Each milestone can have a photo behind its celebration, at `public/postcards/<file>.jpg`. **20 of the 41 are in place.**
 
 ```
 bash scripts/postcards.sh
 ```
 
-One stage per missing landmark: it opens a search, gives you the exact filename,
-checks the file is a real JPEG rather than a saved error page, and writes the
-`img:` line into `src/config.ts` for you. Stop with Ctrl-C any time — re-running
-picks up where you left off.
+One stage per missing landmark: it opens a search, gives you the exact filename, checks the file is a real JPEG rather than a saved error page, and writes the `img:` line into `src/config.ts` for you. Ctrl-C any time — re-running picks up where it left off.
 
-A milestone with no `img` is not broken: `Celebration` confirms the photo loads
-before using it and falls back to the brand treatment otherwise. So a missing
-postcard degrades quietly rather than showing a washed-out overlay over a 404.
+A milestone with no `img` is **not** broken. `Celebration` confirms the photo loads before using it and falls back to the brand treatment otherwise, so a missing postcard degrades quietly rather than showing a washed-out overlay over a 404.
 
-`tulsa.jpg` is the finish frame, and it is meant to be a real photo of the gym
-and the crew — nothing else fills that screen at 8,473,348 m.
+`tulsa.jpg` is the finish frame, and it is meant to be a real photo of the gym and the crew — nothing else fills that screen at 8,473,348 m.
+
+## Notes for whoever works on this next
+
+- **`logEntry` must not read the whole `entries` table.** It used to, and 35 people logging at once produced ~14% `OptimisticConcurrencyControlFailure`. The running total is computed client-side from the live subscription instead. The rate limiter is sharded for the same reason — see the comments in `convex/worldTour.ts`.
+- **`ROUTE` derives from `MILESTONES`**, so changing the route is a data edit in `src/config.ts`, not a code change. The tests will catch an out-of-order milestone, a city with no coordinates, a coordinate outside the continental US (`albersUsa` silently drops those), or a gap longer than two gym days.
+- `simulateDay` and `resetChallenge` are admin-gated but still shipped to production. Handy for testing, worth being careful with during a live challenge.
+- The daily recap buckets days in browser-local time while the server uses a hardcoded UTC−5. Correct in Tulsa, drifts elsewhere.
+
+## Tuning knobs
+
+- `convex/worldTour.ts` — `MULTIPLIER`, the single-entry cap, rate limits. Changes need `npx convex deploy`.
+- `convex/machines.ts` — the machines and their units.
+- `src/config.ts` — `GOAL`, `CHALLENGE_NAME`, `CHALLENGE_WINDOW`, `ACTS`, colours, and the full `MILESTONES` list.
