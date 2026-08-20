@@ -590,48 +590,77 @@ export default function App() {
         </span>
       </div>
 
-      {/* ── Journey bar ── */}
+      {/* ── Journey bar, split into the three acts ──
+           One 8,473 km bar gives the room a single win, 31 days away. Three
+           bars give it three, and the first arrives inside a week. The widths
+           stay proportional to the real distances, so it still reads as one
+           journey — and Act II visibly being half the challenge is the honest
+           thing to show, not something to smooth over. */}
       <div className="max-w-screen-2xl mx-auto px-5 pt-2 pb-1">
-        <div className="relative h-4 rounded-full overflow-visible" style={{ background: '#161616' }}>
-          <div
-            className="absolute left-0 top-0 h-full rounded-full transition-all duration-1000"
-            style={{
-              width: `${pct}%`,
-              background: `linear-gradient(90deg, ${BRAND.darkRed}, ${BRAND.red}, ${BRAND.pink})`,
-              boxShadow: `0 0 14px ${BRAND.red}66`,
-            }}
-          />
-          {/* pace ghost tick */}
-          {pace !== null && day > 0 && !replaying && (
-            <div
-              className="absolute top-[-4px] w-[2px] h-6 bg-white/70"
-              style={{ left: `${Math.min(100, (pace / GOAL) * 100)}%` }}
-              title="On-pace position"
-            />
-          )}
-          {/* city ticks */}
-          {BAR_LABELS.map((c, i) => (
-            <div
-              key={i}
-              className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full"
-              style={{
-                left: `calc(${(c.m / GOAL) * 100}% - 4px)`,
-                background: c.m <= shownTotal ? '#fff' : '#3a3a3a',
-                border: `2px solid ${c.m <= shownTotal ? BRAND.red : '#242424'}`,
-              }}
-            />
-          ))}
-        </div>
-        <div className="relative h-5 mt-1 text-[10px] uppercase tracking-wider text-zinc-500">
-          {BAR_LABELS.map((c, i) => (
-            <span
-              key={i}
-              className="absolute -translate-x-1/2"
-              style={{ left: `${(c.m / GOAL) * 100}%`, color: c.m <= shownTotal ? BRAND.pink : undefined }}
-            >
-              {c.label}
-            </span>
-          ))}
+        <div className="flex gap-1.5 items-end">
+          {ACTS.map((a, i) => {
+            const span = a.to - a.from
+            const filled = Math.max(0, Math.min(span, shownTotal - a.from))
+            const actDone = shownTotal >= a.to
+            const isHere = !actDone && shownTotal >= a.from
+            const cities = BAR_LABELS.filter((c) => c.m > a.from && c.m <= a.to)
+            return (
+              // minWidth 0 or the act names set a floor on each bar, which
+              // breaks the proportions on a narrow screen and stops `truncate`
+              // from ever truncating.
+              <div key={a.name} style={{ flexGrow: span, flexBasis: 0, minWidth: 0 }}>
+                <div
+                  className="relative h-4 rounded-full overflow-visible transition-all duration-500"
+                  style={{
+                    background: '#161616',
+                    border: isHere ? `1px solid ${BRAND.darkRed}` : '1px solid transparent',
+                  }}
+                >
+                  <div
+                    className="absolute left-0 top-0 h-full rounded-full transition-all duration-1000"
+                    style={{
+                      width: `${(filled / span) * 100}%`,
+                      background: `linear-gradient(90deg, ${BRAND.darkRed}, ${BRAND.red}, ${BRAND.pink})`,
+                      boxShadow: filled > 0 ? `0 0 14px ${BRAND.red}66` : undefined,
+                    }}
+                  />
+                  {/* pace ghost, drawn only in the act it currently falls in */}
+                  {pace !== null && day > 0 && !replaying && pace > a.from && pace <= a.to && (
+                    <div
+                      className="absolute top-[-4px] w-[2px] h-6 bg-white/70"
+                      style={{ left: `${((pace - a.from) / span) * 100}%` }}
+                      title="On-pace position"
+                    />
+                  )}
+                  {cities.map((c, j) => (
+                    <div
+                      key={j}
+                      className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full"
+                      style={{
+                        left: `calc(${((c.m - a.from) / span) * 100}% - 4px)`,
+                        background: c.m <= shownTotal ? '#fff' : '#3a3a3a',
+                        border: `2px solid ${c.m <= shownTotal ? BRAND.red : '#242424'}`,
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="mt-1.5 flex items-baseline gap-1.5 overflow-hidden">
+                  <span
+                    className="text-[10px] font-black tracking-[0.2em] shrink-0"
+                    style={{ color: actDone ? BRAND.red : isHere ? BRAND.pink : '#3f3f46' }}
+                  >
+                    {actDone ? '✓' : ACT_NUMERALS[i]}
+                  </span>
+                  <span
+                    className="text-[10px] uppercase tracking-wider truncate"
+                    style={{ color: actDone || isHere ? '#a1a1aa' : '#3f3f46' }}
+                  >
+                    {a.name}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
 
