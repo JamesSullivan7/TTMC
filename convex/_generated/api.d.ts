@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as machines from "../machines.js";
 import type * as worldTour from "../worldTour.js";
 
 import type {
@@ -17,6 +18,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  machines: typeof machines;
   worldTour: typeof worldTour;
 }>;
 

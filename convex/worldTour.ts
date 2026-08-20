@@ -1,12 +1,11 @@
 import { mutation, query } from './_generated/server'
 import { v } from 'convex/values'
+import { MACHINE_NAMES, machineUnit, toMeters, unitAbbrev } from './machines'
 
 // Map scale: every real meter moves the journey this many meters.
 // Set to 1 once the route length is chosen — a US route is short enough that
 // the journey can be 1:1 with real meters, so there is no tailwind to hide.
 const MULTIPLIER = 5
-
-const MACHINES = ['Row', 'Ski', 'Erg Bike', 'Assault Bike', 'Assault Runner']
 
 // Sanity cap on a single entry. The longest plausible single piece on any of
 // these machines is a half-marathon row (~21,000 m), so 60,000 is generous
@@ -55,12 +54,23 @@ export const verifyAdmin = mutation({
 // meters from a phone. With no names, no leaderboard and no prizes there is
 // nothing to win by inflating this, and trainers can undo any entry.
 export const logEntry = mutation({
-  args: { machine: v.string(), meters: v.number() },
-  handler: async (ctx, { machine, meters }) => {
-    if (!MACHINES.includes(machine)) throw new Error('Unknown machine')
-    if (!Number.isFinite(meters) || meters <= 0) throw new Error('Meters must be a positive number')
+  // `amount` is the raw number off the machine's screen, in that machine's own
+  // unit. Conversion to meters happens here, server-side, so nothing
+  // downstream ever has to wonder what unit it is holding.
+  args: { machine: v.string(), amount: v.number() },
+  handler: async (ctx, { machine, amount }) => {
+    const unit = machineUnit(machine)
+    if (unit === null) throw new Error('Unknown machine')
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error('Distance must be a positive number')
+    }
+
+    const meters = toMeters(machine, amount)
     if (meters > MAX_SINGLE_ENTRY) {
-      throw new Error(`Max single entry is ${MAX_SINGLE_ENTRY.toLocaleString('en-US')} meters`)
+      const cap = unit === 'miles' ? MAX_SINGLE_ENTRY / 1609.344 : MAX_SINGLE_ENTRY
+      throw new Error(
+        `Max single entry is ${Math.floor(cap).toLocaleString('en-US')} ${unitAbbrev(unit)}`
+      )
     }
 
     // Total before and after, so the logger can be told exactly which stretch
@@ -69,9 +79,15 @@ export const logEntry = mutation({
     const totalBefore = existing.reduce((s, e) => s + e.journeyMeters, 0)
 
     const journeyMeters = Math.round(meters * MULTIPLIER)
-    await ctx.db.insert('entries', { machine, meters: Math.round(meters), journeyMeters })
+    await ctx.db.insert('entries', {
+      machine,
+      meters: Math.round(meters),
+      journeyMeters,
+      input: amount,
+      unit,
+    })
 
-    return { journeyMeters, totalBefore, totalAfter: totalBefore + journeyMeters }
+    return { journeyMeters, meters: Math.round(meters), totalBefore, totalAfter: totalBefore + journeyMeters }
   },
 })
 
@@ -142,7 +158,7 @@ export const getSummary = query({
     let totalReal = 0
     let firstEntryAt: number | null = null
     const byMachine: Record<string, number> = {}
-    for (const m of MACHINES) byMachine[m] = 0
+    for (const m of MACHINE_NAMES) byMachine[m] = 0
     for (const e of entries) {
       totalJourney += e.journeyMeters
       totalReal += e.meters
@@ -162,6 +178,8 @@ export const getRecent = query({
       machine: e.machine,
       meters: e.meters,
       journeyMeters: e.journeyMeters,
+      input: e.input ?? null,
+      unit: e.unit ?? null,
       at: e._creationTime,
     }))
   },

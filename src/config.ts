@@ -13,8 +13,11 @@ export const CHALLENGE_NAME = 'Cross Country'
 // decided and all of that lights back up on its own.
 export const CHALLENGE_WINDOW: { start: Date; days: number } | null = null
 
-export const MACHINES = ['Row', 'Ski', 'Erg Bike', 'Assault Bike', 'Assault Runner'] as const
-export type Machine = (typeof MACHINES)[number]
+// Machines and their units live in convex/machines.ts so the server and the UI
+// cannot disagree about whether a number is meters or miles.
+import { MACHINE_NAMES, type Machine } from '../convex/machines'
+export type { Machine }
+export const MACHINES = MACHINE_NAMES
 
 export const MACHINE_COLORS: Record<Machine, string> = {
   'Row': '#3B82F6',
