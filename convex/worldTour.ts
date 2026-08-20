@@ -1,21 +1,18 @@
 import { mutation, query } from './_generated/server'
 import { v } from 'convex/values'
 
-// Map scale: every real meter moves the journey 5 meters.
+// Map scale: every real meter moves the journey this many meters.
+// Set to 1 once the route length is chosen — a US route is short enough that
+// the journey can be 1:1 with real meters, so there is no tailwind to hide.
 const MULTIPLIER = 5
 
 const MACHINES = ['Row', 'Ski', 'Erg Bike', 'Assault Bike', 'Assault Runner']
 
-// Tulsa is UTC-5 (CDT) for the whole of September.
+// Tulsa is UTC-5 (CDT) — used only to bucket entries into local gym days.
 const TZ_OFFSET_MS = 5 * 3600 * 1000
 
 function dayKey(creationTime: number): string {
   return new Date(creationTime - TZ_OFFSET_MS).toISOString().slice(0, 10)
-}
-
-async function isBoostActive(ctx: { db: any }): Promise<boolean> {
-  const s = await ctx.db.query('settings').first()
-  return s?.boostActive ?? false
 }
 
 export const logEntry = mutation({
@@ -23,10 +20,9 @@ export const logEntry = mutation({
   handler: async (ctx, { machine, meters }) => {
     if (!MACHINES.includes(machine)) throw new Error('Unknown machine')
     if (!(meters > 0 && meters <= 1_000_000)) throw new Error('Max single entry is 1,000,000 meters')
-    const boost = await isBoostActive(ctx)
-    const journeyMeters = Math.round(meters * MULTIPLIER * (boost ? 2 : 1))
+    const journeyMeters = Math.round(meters * MULTIPLIER)
     await ctx.db.insert('entries', { machine, meters: Math.round(meters), journeyMeters })
-    return { journeyMeters, boosted: boost }
+    return { journeyMeters }
   },
 })
 
@@ -37,29 +33,10 @@ export const deleteEntry = mutation({
   },
 })
 
-// ── Boost day ────────────────────────────────────────────────────────────────
-
-export const getSettings = query({
-  args: {},
-  handler: async (ctx) => {
-    const s = await ctx.db.query('settings').first()
-    return { boostActive: s?.boostActive ?? false }
-  },
-})
-
-export const setBoost = mutation({
-  args: { active: v.boolean() },
-  handler: async (ctx, { active }) => {
-    const s = await ctx.db.query('settings').first()
-    if (s) await ctx.db.patch(s._id, { boostActive: active })
-    else await ctx.db.insert('settings', { boostActive: active })
-  },
-})
-
 // ── Testing tools (used from the dashboard's demo bar) ──────────────────────
 
-// Inserts a realistic day of gym entries (~80 entries, ~1.35M journey meters)
-// using the machine mix observed in the calorie challenge.
+// Inserts a realistic day of gym entries (~80 entries) using the machine mix
+// observed in the calorie challenge: ~273,000 real meters per gym day.
 export const simulateDay = mutation({
   args: {},
   handler: async (ctx) => {

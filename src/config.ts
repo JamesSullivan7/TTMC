@@ -1,7 +1,17 @@
 // ── Challenge configuration ─────────────────────────────────────────────────
+// PLACEHOLDER: still the around-the-world number. Gets replaced when the
+// cross-country route is chosen — route length and MULTIPLIER (in
+// convex/worldTour.ts) are the same decision, sized against ~273,000 real
+// meters per gym day.
 export const GOAL = 40_000_000
-export const CHALLENGE_START = new Date('2026-09-01T00:00:00')
-export const CHALLENGE_DAYS = 30
+
+// PLACEHOLDER: challenge name — header, TV title, and share cards read this.
+export const CHALLENGE_NAME = 'Cross Country'
+
+// Date window. null = open-ended: no countdown, no day counter, no pace ghost,
+// no "day N of N" on share cards. Set { start, days } once the dates are
+// decided and all of that lights back up on its own.
+export const CHALLENGE_WINDOW: { start: Date; days: number } | null = null
 
 // PIN that unlocks trainer (kiosk) mode on a device.
 export const KIOSK_PIN = '6426'
@@ -122,18 +132,27 @@ export function fmtKm(meters: number) {
   return `${Math.round(meters / 1000).toLocaleString('en-US')} km`
 }
 
-// Day of challenge: 0 = not started, 1..30 during, >30 overtime.
+// Day of challenge: 0 = not started or no window set, 1..N during, >N overtime.
 export function challengeDay(now = new Date()): number {
-  const msPerDay = 86_400_000
-  const diff = now.getTime() - CHALLENGE_START.getTime()
+  if (!CHALLENGE_WINDOW) return 0
+  const diff = now.getTime() - CHALLENGE_WINDOW.start.getTime()
   if (diff < 0) return 0
-  return Math.floor(diff / msPerDay) + 1
+  return Math.floor(diff / 86_400_000) + 1
 }
 
-// Where the pace ghost should be right now (meters).
-export function paceTarget(now = new Date()): number {
-  const total = CHALLENGE_DAYS * 86_400_000
-  const elapsed = now.getTime() - CHALLENGE_START.getTime()
+// Where the pace ghost should be right now (meters). null = no window, so
+// there is no pace to be ahead of or behind.
+export function paceTarget(now = new Date()): number | null {
+  if (!CHALLENGE_WINDOW) return null
+  const total = CHALLENGE_WINDOW.days * 86_400_000
+  const elapsed = now.getTime() - CHALLENGE_WINDOW.start.getTime()
   const frac = Math.max(0, Math.min(1, elapsed / total))
   return GOAL * frac
+}
+
+// Days until the challenge opens. null = no window, or it has already begun.
+export function daysToStart(now = new Date()): number | null {
+  if (!CHALLENGE_WINDOW) return null
+  const diff = CHALLENGE_WINDOW.start.getTime() - now.getTime()
+  return diff > 0 ? Math.ceil(diff / 86_400_000) : null
 }

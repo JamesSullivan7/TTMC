@@ -7,7 +7,4 @@ export default defineSchema({
     meters: v.number(),
     journeyMeters: v.number(),
   }),
-  settings: defineTable({
-    boostActive: v.boolean(),
-  }),
 })

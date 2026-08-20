@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Milestone, BRAND, fmt } from './config'
+import { Milestone, BRAND, fmt, CHALLENGE_NAME } from './config'
 import { downloadShareCard } from './shareCard'
 
 const CONFETTI_COLORS = ['#D93B58', '#F29BAB', '#8C2336', '#ffffff']
@@ -122,7 +122,7 @@ export default function Celebration({
           </button>
 
           <div className="mt-6 text-xs uppercase tracking-widest text-zinc-400">
-            {isFinish ? 'Click anywhere to continue' : 'Tulsa Training — World Tour'}
+            {isFinish ? 'Click anywhere to continue' : `Tulsa Training — ${CHALLENGE_NAME}`}
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { Milestone, BRAND, fmt, CHALLENGE_DAYS } from './config'
+import { Milestone, BRAND, fmt, CHALLENGE_NAME, CHALLENGE_WINDOW } from './config'
 
 // Renders a 1080×1080 branded share card for a milestone and downloads it.
 export async function downloadShareCard(milestone: Milestone, day: number) {
@@ -70,7 +70,10 @@ export async function downloadShareCard(milestone: Milestone, day: number) {
   const statsY = startY + lines.length * (fontSize + 14) + 50
   ctx.fillStyle = '#ffffff'
   ctx.font = '700 42px Inter'
-  const dayPart = day > 0 ? ` · DAY ${Math.min(day, CHALLENGE_DAYS)} OF ${CHALLENGE_DAYS}` : ''
+  const dayPart =
+    CHALLENGE_WINDOW && day > 0
+      ? ` · DAY ${Math.min(day, CHALLENGE_WINDOW.days)} OF ${CHALLENGE_WINDOW.days}`
+      : ''
   ctx.fillText(`${fmt(milestone.m)} METERS${dayPart}`, size / 2, statsY)
 
   // Bottom bar
@@ -80,7 +83,7 @@ export async function downloadShareCard(milestone: Milestone, day: number) {
   ctx.font = '700 36px Inter'
   ctx.save()
   ctx.letterSpacing = '8px'
-  ctx.fillText('AROUND THE WORLD · SEPTEMBER 2026', size / 2, size - 42)
+  ctx.fillText(`TULSA TRAINING · ${CHALLENGE_NAME.toUpperCase()}`, size / 2, size - 42)
   ctx.restore()
 
   // Download
@@ -88,7 +91,7 @@ export async function downloadShareCard(milestone: Milestone, day: number) {
   if (!blob) return
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = `tt-world-tour-${milestone.m}.png`
+  a.download = `tt-${CHALLENGE_NAME.toLowerCase().replace(/s+/g, '-')}-${milestone.m}.png`
   a.click()
   URL.revokeObjectURL(a.href)
 }

@@ -83,29 +83,6 @@ export function EntryForm() {
   )
 }
 
-export function BoostToggle() {
-  const settings = useQuery(api.worldTour.getSettings)
-  const setBoost = useMutation(api.worldTour.setBoost)
-  const active = settings?.boostActive ?? false
-
-  return (
-    <button
-      onClick={() => {
-        if (!active && !window.confirm('Turn ON boost day? Every entry counts DOUBLE until you turn it off.')) return
-        setBoost({ active: !active })
-      }}
-      className="px-3 py-1.5 rounded-lg font-black text-xs uppercase tracking-wider transition-all hover:opacity-80"
-      style={
-        active
-          ? { background: BRAND.red, color: '#fff', border: `1px solid ${BRAND.red}` }
-          : { background: '#141414', border: '1px solid #2a2a2a', color: '#a1a1aa' }
-      }
-    >
-      {active ? 'Boost day: ON (2×)' : 'Boost day: off'}
-    </button>
-  )
-}
-
 export function DemoTools() {
   const simulateDay = useMutation(api.worldTour.simulateDay)
   const resetChallenge = useMutation(api.worldTour.resetChallenge)

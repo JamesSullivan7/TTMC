@@ -3,7 +3,7 @@ import { useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import GlobeView from './GlobeView'
 import Celebration from './Celebration'
-import { EntryForm, RecentEntries, DemoTools, BoostToggle } from './EntryPanel'
+import { EntryForm, RecentEntries, DemoTools } from './EntryPanel'
 import { downloadShareCard } from './shareCard'
 import {
   GOAL,
@@ -19,8 +19,9 @@ import {
   fmtKm,
   challengeDay,
   paceTarget,
-  CHALLENGE_DAYS,
-  CHALLENGE_START,
+  daysToStart,
+  CHALLENGE_NAME,
+  CHALLENGE_WINDOW,
 } from './config'
 import { locationLabel } from './geo'
 
@@ -154,7 +155,6 @@ function RecapOverlay({
 
 export default function App() {
   const summary = useQuery(api.worldTour.getSummary)
-  const settings = useQuery(api.worldTour.getSettings)
   const daily = useQuery(api.worldTour.getDaily)
   const [tvMode, setTvMode] = useState(false)
   const [kiosk, setKiosk] = useState(() => localStorage.getItem('tt-kiosk') === '1')
@@ -172,7 +172,6 @@ export default function App() {
   }, [])
 
   const total = summary?.totalJourney ?? 0
-  const boostActive = settings?.boostActive ?? false
   const replaying = replayValue !== null
   const shownTotal = replaying ? replayValue! : total
   const animatedTotal = useAnimatedNumber(total)
@@ -278,17 +277,21 @@ export default function App() {
   }, [])
 
   const day = challengeDay(now)
-  const daysToStart = Math.max(0, Math.ceil((CHALLENGE_START.getTime() - now.getTime()) / 86_400_000))
+  const toStart = daysToStart(now)
   const pace = paceTarget(now)
-  const paceDiff = total - pace
+  const paceDiff = pace === null ? null : total - pace
   const pct = Math.min(100, (shownTotal / GOAL) * 100)
   const loc = locationLabel(shownTotal)
   const celeb = celebQueue[0] ?? null
 
-  // Projected arrival: rate from challenge start (or first entry, pre-September).
+  // Projected arrival: rate from the challenge start, or from the first entry
+  // when there is no date window.
   let projected: Date | null = null
   if (total > 0 && total < GOAL && summary?.firstEntryAt) {
-    const rateBasis = day > 0 ? CHALLENGE_START.getTime() : summary.firstEntryAt
+    // With a date window, rate is measured from the official start. Without
+    // one, from the first entry ever logged.
+    const rateBasis =
+      CHALLENGE_WINDOW && day > 0 ? CHALLENGE_WINDOW.start.getTime() : summary.firstEntryAt
     const elapsed = now.getTime() - rateBasis
     if (elapsed > 60_000) {
       const rate = total / elapsed // meters per ms
@@ -346,7 +349,7 @@ export default function App() {
                 <div className="text-xs font-bold tracking-[0.3em] uppercase" style={{ color: BRAND.red }}>
                   Tulsa Training
                 </div>
-                <div className="font-display text-2xl uppercase tracking-wide leading-none">World Tour</div>
+                <div className="font-display text-2xl uppercase tracking-wide leading-none">{CHALLENGE_NAME}</div>
               </div>
               <button
                 onClick={enterTvMode}
@@ -357,7 +360,6 @@ export default function App() {
               </button>
               {kiosk ? (
                 <>
-                  <BoostToggle />
                   <button
                     onClick={trainerLock}
                     className="px-3 py-2 rounded-lg font-bold text-xs uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors"
@@ -387,28 +389,18 @@ export default function App() {
         style={{ height: tvMode ? '72vh' : '58vh', background: '#050505' }}
         onDoubleClick={tvMode ? exitTvMode : undefined}
       >
-        <GlobeView totalMeters={shownTotal} paceMeters={replaying ? 0 : pace} flyToSignal={flyToSignal} follow={replaying} />
+        <GlobeView totalMeters={shownTotal} paceMeters={replaying ? 0 : pace ?? 0} flyToSignal={flyToSignal} follow={replaying} />
 
-        {/* Boost banner */}
-        {boostActive && !replaying && (
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none">
-            <div
-              className="pulse-dot px-6 py-2 rounded-b-xl font-display uppercase tracking-wide text-lg"
-              style={{ background: BRAND.red, color: '#fff', boxShadow: `0 0 30px ${BRAND.red}88` }}
-            >
-              Boost day — every meter counts twice
-            </div>
-          </div>
-        )}
-
-        {/* Countdown — only inside the final week before September 1 */}
-        {day === 0 && daysToStart <= 7 && !replaying && (
+        {/* Countdown — only inside the final week before the start date.
+            No date window set means no countdown at all. */}
+        {toStart !== null && toStart <= 7 && !replaying && (
           <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center pointer-events-none">
             <div className="text-sm font-bold tracking-[0.5em] uppercase mb-2" style={{ color: BRAND.pink }}>
-              Around the world begins September 1
+              {CHALLENGE_NAME} begins{' '}
+              {CHALLENGE_WINDOW?.start.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
             </div>
             <div className="font-display uppercase leading-none" style={{ fontSize: 'clamp(3rem, 8vw, 6.5rem)', textShadow: '0 2px 30px rgba(0,0,0,0.9)' }}>
-              T-minus {daysToStart} {daysToStart === 1 ? 'day' : 'days'}
+              T-minus {toStart} {toStart === 1 ? 'day' : 'days'}
             </div>
           </div>
         )}
@@ -425,7 +417,7 @@ export default function App() {
         {/* Top-left: the big number */}
         <div className="absolute top-4 left-5 pointer-events-none">
           <div className="text-xs font-bold tracking-[0.35em] uppercase mb-1" style={{ color: BRAND.pink }}>
-            {tvMode ? 'Tulsa Training — World Tour' : 'Around the world'}
+            {tvMode ? `Tulsa Training — ${CHALLENGE_NAME}` : CHALLENGE_NAME}
           </div>
           <div className="font-display leading-none tabular-nums" style={{ fontSize: tvMode ? '5.5rem' : '3.8rem', textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}>
             {fmt(replaying ? shownTotal : animatedTotal)}
@@ -441,10 +433,16 @@ export default function App() {
         {/* Top-right: day + pace + projection */}
         {!replaying && (
           <div className="absolute top-4 right-5 text-right pointer-events-none">
-            <div className="font-display text-3xl uppercase leading-none" style={{ textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}>
-              {day === 0 ? 'Pre-season' : day <= CHALLENGE_DAYS ? `Day ${day} of ${CHALLENGE_DAYS}` : 'Overtime'}
-            </div>
-            {day > 0 && (
+            {CHALLENGE_WINDOW && (
+              <div className="font-display text-3xl uppercase leading-none" style={{ textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}>
+                {day === 0
+                  ? 'Pre-season'
+                  : day <= CHALLENGE_WINDOW.days
+                    ? `Day ${day} of ${CHALLENGE_WINDOW.days}`
+                    : 'Overtime'}
+              </div>
+            )}
+            {paceDiff !== null && day > 0 && (
               <div
                 className="mt-2 inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider"
                 style={{
@@ -466,7 +464,7 @@ export default function App() {
             )}
             {total >= GOAL && (
               <div className="mt-2 text-sm font-black uppercase tracking-widest" style={{ color: BRAND.pink }}>
-                Around the world — complete
+                {CHALLENGE_NAME} — complete
               </div>
             )}
           </div>
@@ -542,7 +540,7 @@ export default function App() {
             }}
           />
           {/* pace ghost tick */}
-          {day > 0 && !replaying && (
+          {pace !== null && day > 0 && !replaying && (
             <div
               className="absolute top-[-4px] w-[2px] h-6 bg-white/70"
               style={{ left: `${Math.min(100, (pace / GOAL) * 100)}%` }}
