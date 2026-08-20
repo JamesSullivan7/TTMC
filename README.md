@@ -56,9 +56,23 @@ Backend: Convex deployment `tt-world-tour` (team james-7ecd5, dev deployment fin
 
 ## Deploying
 
+First time, run the wizard — it does all of the below, generates the production
+trainer key, and proves the destructive mutations are actually locked down
+before it hands you the URL:
+
+```
+bash scripts/first-deploy.sh
+```
+
+It is safe to re-run; it offers to keep the existing production key rather than
+rotating it out from under the trainers' devices.
+
+By hand, it is:
+
 1. `npx convex deploy` — pushes functions to the production Convex deployment.
-2. Deploy to Vercel with `VITE_CONVEX_URL` set to the **production** Convex URL.
-3. Open the site on the gym computer, hit TV mode on the TV browser window.
+2. `npx convex env set ADMIN_KEY <value> --prod` — production needs its own key.
+3. Deploy to Vercel with `VITE_CONVEX_URL` set to the **production** Convex URL.
+4. Open the site on the gym computer, hit TV mode on the TV browser window.
 
 **Not yet done.** There is no Vercel project and no Convex production deployment. Also note every Convex mutation is currently unauthenticated — including `resetChallenge`, which wipes the challenge — and `VITE_CONVEX_URL` ships in the client bundle. That needs locking down before this goes on a public URL.
 
