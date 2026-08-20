@@ -10,11 +10,13 @@ A collective gym challenge: the whole gym covers one long route together, cardio
 - **Trainer login** (PIN in `src/config.ts`, currently `6426`) unlocks the entry form, recent-entries undo, and testing tools on that device. "Lock" returns it to member view.
 - Trainers log cardio meters: pick the machine, type the meters off the screen, hit **Log it**.
 - Every real meter moves the journey `MULTIPLIER` meters, applied server-side in `convex/worldTour.ts`.
-- The dashboard shows the route with the logo riding it and stamping every city passed, plus the milestone feed and per-machine totals.
+- The dashboard shows a US map with the route drawn across it — the road behind you in brand red, the road ahead dashed — the logo riding the current position, plus the milestone feed and per-machine totals.
 - Crossing a landmark fires a celebration automatically — with a postcard backdrop if a photo exists at the milestone's `img` path (drop JPGs into `public/postcards/`), and a **Save share card** button that downloads a 1080×1080 branded image for Instagram. Share cards can also be downloaded anytime via the ↓ next to each unlocked milestone.
 - **Daily recap**: each morning the display opens with yesterday's numbers; also available on demand.
 - **Replay the journey**: animates the whole trip from the start to the current position in ~50 seconds — built for the finish party.
 - **TV mode** button: fullscreen display for the gym TV (double-click the map or press the small "exit" label to leave).
+
+The map is a static SVG (d3-geo `albersUsa` + `us-atlas` state shapes) in a fixed 975x610 viewBox that scales to any screen. No WebGL, no camera, no render loop, no network — it is meant to sit on a TV for a month without anyone touching it.
 
 ### Dates are optional
 

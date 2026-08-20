@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
-import GlobeView from './GlobeView'
+import MapView from './MapView'
 import Celebration from './Celebration'
 import { EntryForm, RecentEntries, DemoTools } from './EntryPanel'
 import { downloadShareCard } from './shareCard'
@@ -164,7 +164,6 @@ export default function App() {
     () => localStorage.getItem('tt-kiosk') === '1' && getAdminKey() !== ''
   )
   const [celebQueue, setCelebQueue] = useState<Milestone[]>([])
-  const [flyToSignal, setFlyToSignal] = useState(0)
   const [showRecap, setShowRecap] = useState(false)
   const [replayValue, setReplayValue] = useState<number | null>(null)
   const prevTotal = useRef<number | null>(null)
@@ -198,10 +197,7 @@ export default function App() {
         const last = crossed[crossed.length - 1]
         crossed = majors.includes(last) ? majors : [...majors, last]
       }
-      if (crossed.length > 0) {
-        setCelebQueue((q) => [...q, ...crossed])
-        setFlyToSignal((s) => s + 1)
-      }
+      if (crossed.length > 0) setCelebQueue((q) => [...q, ...crossed])
     }
     prevTotal.current = total
   }, [total, summary])
@@ -405,13 +401,13 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Globe hero ── */}
+      {/* ── Map hero ── */}
       <div
         className="relative w-full"
         style={{ height: tvMode ? '72vh' : '58vh', background: '#050505' }}
         onDoubleClick={tvMode ? exitTvMode : undefined}
       >
-        <GlobeView totalMeters={shownTotal} paceMeters={replaying ? 0 : pace ?? 0} flyToSignal={flyToSignal} follow={replaying} />
+        <MapView totalMeters={shownTotal} paceMeters={replaying ? 0 : pace ?? 0} />
 
         {/* Countdown — only inside the final week before the start date.
             No date window set means no countdown at all. */}
