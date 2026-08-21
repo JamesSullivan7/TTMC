@@ -123,6 +123,29 @@ A milestone with no `img` is **not** broken. `Celebration` confirms the photo lo
 
 `tulsa.jpg` is the finish frame, and it is meant to be a real photo of the gym and the crew — nothing else fills that screen at 8,473,348 m.
 
+## The gym display
+
+It is a website — there is nothing to install on the gym computer. Open the site
+and press **TV mode**.
+
+Double-clickable launchers that do it properly — full screen, no address bar,
+and the screen kept awake:
+
+| | |
+|---|---|
+| macOS | `scripts/gym-tv.command` |
+| Windows | `scripts/gym-tv.bat` |
+
+Copy the one you need onto that machine. The Mac one also runs `caffeinate` so
+the display never blanks; `killall caffeinate` releases it.
+
+**Do not log in as a trainer on the display machine.** It is the wall screen, and
+a trainer session parks an entry form and a Reset button in front of the whole
+gym for a month. Members log from their own phones via the QR codes.
+
+If the TV is a second display rather than a mirror, move the browser window onto
+it before going full screen — kiosk mode opens wherever the browser already was.
+
 ## Notes for whoever works on this next
 
 - **`logEntry` must not read the whole `entries` table.** It used to, and 35 people logging at once produced ~14% `OptimisticConcurrencyControlFailure`. The running total is computed client-side from the live subscription instead. The rate limiter is sharded for the same reason — see the comments in `convex/worldTour.ts`.
