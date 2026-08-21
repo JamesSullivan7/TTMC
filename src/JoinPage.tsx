@@ -46,6 +46,28 @@ export default function JoinPage() {
     return people.find((p) => p.name.toLowerCase() === key) ?? null
   }, [people, first, last])
 
+  // Split once when the roster arrives, not on every keystroke.
+  const indexed = useMemo(
+    () => (people ?? []).map((p) => ({ p, words: p.name.toLowerCase().split(/\s+/) })),
+    [people]
+  )
+
+  // Matched on any word start, so "sul" finds James Sullivan and "ja" finds
+  // every James and Jackson. Filtered here rather than on the server: the
+  // roster arrives once and every keystroke is instant with no round trip.
+  const suggestions = useMemo(() => {
+    const terms = `${first} ${last}`.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    if (!terms.length || terms.join(' ').length < 2) return []
+    const exact = `${first.trim()} ${last.trim()}`.toLowerCase()
+    return indexed
+      .filter(({ p, words }) => {
+        if (p.name.toLowerCase() === exact) return false // already covered below
+        return terms.every((t) => words.some((w) => w.startsWith(t)))
+      })
+      .slice(0, 5)
+      .map(({ p }) => p)
+  }, [indexed, first, last])
+
   const amount = meters ?? (custom ? Math.round(Number(custom)) : 0)
   const canSubmit = first.trim().length >= 2 && last.trim().length >= 1 && amount >= 1000 && !busy
 
@@ -149,7 +171,35 @@ export default function JoinPage() {
             </div>
           </div>
 
-          {existing && (
+          {/* Suggestions from the gym's member list. Typing "ja" narrows to the
+              Jameses and Jacksons; tapping one fills both fields, which is how
+              a roster of 182 stays 182 rows instead of quietly becoming 210
+              because people spell themselves differently on a phone. */}
+          {suggestions.length > 0 && (
+            <div className="mt-2 rounded-xl overflow-hidden" style={{ border: '1.5px solid #2a2a2a' }}>
+              {suggestions.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    setFirst(p.firstName)
+                    setLast(p.lastName)
+                  }}
+                  className="w-full text-left px-3 py-3 text-base font-bold transition-colors"
+                  style={{ background: '#0d0d0d', color: '#d4d4d8', borderBottom: '1px solid #161616' }}
+                >
+                  {p.name}
+                  {p.pledgeMeters > 0 && (
+                    <span className="text-xs font-normal ml-2" style={{ color: BRAND.pink }}>
+                      already pledged {fmt(p.pledgeMeters)}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {existing && existing.pledgeMeters > 0 && (
             <div className="mt-3 text-xs rounded-lg px-3 py-2" style={{ background: '#161616', border: `1px solid ${BRAND.darkRed}`, color: BRAND.pink }}>
               You already pledged {fmt(existing.pledgeMeters)} m. Pledging more will raise it.
             </div>

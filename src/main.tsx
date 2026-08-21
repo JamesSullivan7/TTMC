@@ -6,6 +6,7 @@ import LogPage from './LogPage'
 import QrPage from './QrPage'
 import JoinPage from './JoinPage'
 import PledgePage from './PledgePage'
+import PledgesPage from './PledgesPage'
 import { CHALLENGE_WINDOW } from './config'
 import './index.css'
 
@@ -14,7 +15,8 @@ const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string)
 // Five surfaces, five audiences, no router library:
 //   /       anyone watching, and the trainer computer
 //   /tv     the gym TV — display layout, locked, nothing to log in to
-//   /pledge the pre-season board, forced (useful after the start too)
+//   /pledge  the pre-season board, forced (useful after the start too)
+//   /pledges who has pledged what — browsable, searchable
 //   /join   a member's phone: claim your meters
 //   /log    a member's phone: log what you did
 //   /qr     a trainer printing the machine codes, once
@@ -49,6 +51,7 @@ function Route() {
   if (path === '/qr') return <QrPage />
   if (path === '/join') return <JoinPage />
   if (path === '/pledge') return <PledgePage />
+  if (path === '/pledges') return <PledgesPage />
   if (path === '/tv') return <GymTv />
   return <App />
 }

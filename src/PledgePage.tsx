@@ -53,7 +53,10 @@ function Countdown({ start }: { start: Date }) {
 }
 
 export default function PledgePage() {
-  const people = useQuery(api.people.listPeople)
+  const roster = useQuery(api.people.listPeople)
+  // Roster entries imported from the member list sit at 0 until their owner
+  // pledges. Nobody goes on the TV having committed to nothing.
+  const people = useMemo(() => (roster ?? []).filter((p) => p.pledgeMeters > 0), [roster])
   const trainerKey = getTrainerKey()
   // Only used to fold the log token into the QR, so one scan sets a phone up
   // to both pledge now and log meters in September. The board works fine
@@ -87,10 +90,10 @@ export default function PledgePage() {
     return () => { cancelled = true }
   }, [joinUrl])
 
-  const totalPledged = (people ?? []).reduce((s, p) => s + p.pledgeMeters, 0)
+  const totalPledged = people.reduce((s, p) => s + p.pledgeMeters, 0)
   const remaining = Math.max(0, GOAL - totalPledged)
   const pct = Math.min(100, (totalPledged / GOAL) * 100)
-  const pageCount = Math.max(1, Math.ceil((people?.length ?? 0) / PAGE_SIZE))
+  const pageCount = Math.max(1, Math.ceil(people.length / PAGE_SIZE))
 
   useEffect(() => {
     if (pageCount <= 1) return
@@ -98,10 +101,10 @@ export default function PledgePage() {
     return () => clearInterval(t)
   }, [pageCount])
 
-  const shown = (people ?? []).slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
+  const shown = people.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col overflow-hidden">
+    <div className="h-screen bg-[#050505] text-white flex flex-col overflow-hidden">
       {/* Header */}
       <div className="relative shrink-0" style={{ borderBottom: '1px solid #171717' }}>
         <div
@@ -113,14 +116,14 @@ export default function PledgePage() {
             <img
               src="/logo-t.png"
               alt=""
-              className="w-14 h-14 rounded-full"
-              style={{ border: `2px solid ${BRAND.darkRed}` }}
+              className="w-24 h-24 rounded-full"
+              style={{ border: `3px solid ${BRAND.darkRed}`, boxShadow: `0 0 24px ${BRAND.darkRed}55` }}
             />
             <div>
-              <div className="text-xs font-black tracking-[0.4em] uppercase" style={{ color: BRAND.red }}>
+              <div className="text-sm font-black tracking-[0.4em] uppercase" style={{ color: BRAND.red }}>
                 Tulsa Training
               </div>
-              <div className="font-display text-3xl uppercase tracking-wide leading-none">{CHALLENGE_NAME}</div>
+              <div className="font-display text-4xl uppercase tracking-wide leading-none mt-0.5">{CHALLENGE_NAME}</div>
             </div>
           </div>
           <div className="text-right">
@@ -154,7 +157,26 @@ export default function PledgePage() {
       </div>
 
       {/* Pledged so far, and the code to join it */}
-      <div className="flex items-center gap-10 px-8 py-6 shrink-0">
+      <div className="flex items-stretch gap-8 px-8 py-6 shrink-0">
+        {/* The pledge total as a column that fills from the bottom. It reads
+            as a level rising rather than a task completing, which is the right
+            feeling for something people are still being asked to join. */}
+        <div className="shrink-0 flex flex-col items-center">
+          <div className="text-[10px] font-black tabular-nums mb-2" style={{ color: BRAND.pink }}>
+            {pct < 1 && pct > 0 ? '<1' : Math.round(pct)}%
+          </div>
+          <div className="relative w-10 flex-1 rounded-full overflow-hidden" style={{ background: '#161616' }}>
+            <div
+              className="absolute bottom-0 left-0 right-0 rounded-full transition-all duration-1000"
+              style={{
+                height: `${pct}%`,
+                background: `linear-gradient(0deg, ${BRAND.darkRed}, ${BRAND.red}, ${BRAND.pink})`,
+                boxShadow: `0 0 22px ${BRAND.red}77`,
+              }}
+            />
+          </div>
+        </div>
+
         <div className="flex-1 min-w-0">
           <div className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: BRAND.pink }}>
             Pledged so far
@@ -164,17 +186,6 @@ export default function PledgePage() {
           </div>
           <div className="text-zinc-400 text-lg mt-1">
             of <span className="text-white font-bold">{fmt(GOAL)}</span> meters
-          </div>
-
-          <div className="relative h-5 rounded-full mt-5" style={{ background: '#161616' }}>
-            <div
-              className="absolute left-0 top-0 h-full rounded-full transition-all duration-1000"
-              style={{
-                width: `${pct}%`,
-                background: `linear-gradient(90deg, ${BRAND.darkRed}, ${BRAND.red}, ${BRAND.pink})`,
-                boxShadow: `0 0 18px ${BRAND.red}66`,
-              }}
-            />
           </div>
 
           <div className="mt-4 flex items-baseline gap-6">
@@ -188,10 +199,10 @@ export default function PledgePage() {
                 </div>
                 <div>
                   <div className="font-display uppercase leading-none" style={{ fontSize: 'clamp(1.6rem, 3.4vw, 3rem)' }}>
-                    {people?.length ?? 0}
+                    {people.length}
                   </div>
                   <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 mt-1">
-                    {people?.length === 1 ? 'person in' : 'people in'}
+                    {people.length === 1 ? 'person in' : 'people in'}
                   </div>
                 </div>
               </>
@@ -201,7 +212,7 @@ export default function PledgePage() {
                   The whole road is pledged
                 </div>
                 <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 mt-1.5">
-                  {people?.length ?? 0} people · anything more is a head start
+                  {people.length} people · anything more is a head start
                 </div>
               </div>
             )}
@@ -247,7 +258,7 @@ export default function PledgePage() {
           )}
         </div>
 
-        {people && people.length === 0 ? (
+        {roster && people.length === 0 ? (
           <div className="text-zinc-600 text-lg">
             Nobody has pledged yet. Be the first — scan the code.
           </div>

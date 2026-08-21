@@ -17,7 +17,6 @@ import {
   Milestone,
   BRAND,
   MARATHON,
-  EVEREST,
   fmt,
   fmtKm,
   challengeDay,
@@ -546,8 +545,7 @@ export default function App({ castMode = false }: { castMode?: boolean }) {
         <div className="absolute bottom-4 right-5 text-right">
           <div className="text-xs text-zinc-500 uppercase tracking-widest mb-1 pointer-events-none">So far that's</div>
           <div className="text-sm text-zinc-300 pointer-events-none" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>
-            <span className="font-black text-white tabular-nums">{fmt(Math.floor(shownTotal / MARATHON))}</span> marathons ·{' '}
-            <span className="font-black text-white tabular-nums">{fmt(Math.floor(shownTotal / EVEREST))}</span> Everests
+            <span className="font-black text-white tabular-nums">{fmt(Math.floor(shownTotal / MARATHON))}</span> marathons
           </div>
           <div className="mt-2 flex gap-2 justify-end">
             {yesterdayRow && !replaying && (

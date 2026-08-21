@@ -25,16 +25,23 @@ export default function QrPage() {
     ;(async () => {
       try {
         const QR = await import('qrcode')
+        const opts = {
+          width: 640,
+          margin: 1,
+          errorCorrectionLevel: 'M' as const,
+          color: { dark: '#050505', light: '#ffffff' },
+        }
         const out: Record<string, string> = {}
         for (const m of MACHINES) {
           const url = `${window.location.origin}/log?m=${encodeURIComponent(m)}&t=${encodeURIComponent(token)}`
-          out[m] = await QR.toDataURL(url, {
-            width: 640,
-            margin: 1,
-            errorCorrectionLevel: 'M',
-            color: { dark: '#050505', light: '#ffffff' },
-          })
+          out[m] = await QR.toDataURL(url, opts)
         }
+        // Carries the token too, so one scan both pledges now and sets the
+        // phone up to log meters in September.
+        out.__pledge = await QR.toDataURL(
+          `${window.location.origin}/join?t=${encodeURIComponent(token)}`,
+          opts
+        )
         if (!cancelled) setCodes(out)
       } catch {
         if (!cancelled) setFailed(true)
@@ -93,6 +100,30 @@ export default function QrPage() {
       </div>
 
       <div className="max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-6">
+        {/* The pledge card. Same code as the gym TV, so it can go on the front
+            desk too — the sign-up drive only has the days before September to
+            happen in, and one screen is one place to catch people. */}
+        {codes.__pledge && (
+          <div
+            className="card rounded-2xl p-6 text-center sm:col-span-2"
+            style={{ border: `3px solid ${BRAND.red}` }}
+          >
+            <div className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: BRAND.red }}>
+              Tulsa Training · {CHALLENGE_NAME}
+            </div>
+            <div className="font-display text-4xl uppercase mt-1 leading-none">Pledge your meters</div>
+            <img src={codes.__pledge} alt="QR code to pledge" className="w-56 h-56 mx-auto my-4" />
+            <div className="font-black text-lg uppercase tracking-wide">
+              Scan to pledge your meters
+            </div>
+            <p className="text-sm text-zinc-600 mt-2 leading-relaxed max-w-md mx-auto">
+              This September the whole gym drives one road together — Tulsa to Los Angeles to
+              New York and home. Put in your name and say how many meters you will cover.
+              Whatever is honest for you.
+            </p>
+          </div>
+        )}
+
         {MACHINES.map((m) => (
           <div
             key={m}
