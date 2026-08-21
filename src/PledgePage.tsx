@@ -12,7 +12,7 @@ import { getTrainerKey } from './keys'
 // name is at the top of the gym screen within seconds — which is the whole
 // reason anyone bothers to do it while they are standing there.
 
-const PAGE_SIZE = 24
+const PAGE_SIZE = 32
 const PAGE_MS = 9000
 
 function Countdown({ start }: { start: Date }) {
@@ -42,7 +42,7 @@ function Countdown({ start }: { start: Date }) {
     <div className="flex items-end gap-4 justify-end">
       {parts.map(([val, unit]) => (
         <div key={unit} className="text-right">
-          <div className="font-display leading-none tabular-nums" style={{ fontSize: 'clamp(2.2rem, 5vw, 4.4rem)' }}>
+          <div className="font-display leading-none tabular-nums" style={{ fontSize: 'clamp(1.8rem, 3.4vw, 3.2rem)' }}>
             {String(val).padStart(2, '0')}
           </div>
           <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 mt-1">{unit}</div>
@@ -111,7 +111,7 @@ export default function PledgePage() {
           className="absolute inset-0 pointer-events-none"
           style={{ background: 'radial-gradient(ellipse 70% 140% at 50% 0%, rgba(217,59,88,0.16) 0%, transparent 70%)' }}
         />
-        <div className="relative flex items-center justify-between px-8 py-4">
+        <div className="relative flex items-center justify-between px-8 py-3">
           <div className="flex items-center gap-4">
             <img
               src="/logo-t.png"
@@ -141,13 +141,13 @@ export default function PledgePage() {
           and a screen that needs a trainer standing next to it explaining the
           QR code is a screen that does not work. */}
       <div
-        className="shrink-0 px-8 py-5 text-center"
+        className="shrink-0 px-8 py-3 text-center"
         style={{ borderBottom: '1px solid #141414', background: '#0a0a0d' }}
       >
-        <div className="font-display uppercase leading-none" style={{ fontSize: 'clamp(1.5rem, 3.2vw, 2.6rem)' }}>
+        <div className="font-display uppercase leading-none" style={{ fontSize: 'clamp(1.2rem, 2.2vw, 1.9rem)' }}>
           This September the whole gym drives one road together
         </div>
-        <div className="mt-3 text-lg text-zinc-400">
+        <div className="mt-2 text-base text-zinc-400">
           Tulsa <span style={{ color: BRAND.red }}>→</span> Los Angeles{' '}
           <span style={{ color: BRAND.red }}>→</span> New York{' '}
           <span style={{ color: BRAND.red }}>→</span> Tulsa ·{' '}
@@ -157,7 +157,7 @@ export default function PledgePage() {
       </div>
 
       {/* Pledged so far, and the code to join it */}
-      <div className="flex items-stretch gap-8 px-8 py-6 shrink-0">
+      <div className="flex items-stretch gap-8 px-8 py-4 shrink-0">
         {/* The pledge total as a column that fills from the bottom. It reads
             as a level rising rather than a task completing, which is the right
             feeling for something people are still being asked to join. */}
@@ -181,10 +181,10 @@ export default function PledgePage() {
           <div className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: BRAND.pink }}>
             Pledged so far
           </div>
-          <div className="font-display leading-none tabular-nums mt-1" style={{ fontSize: 'clamp(3.5rem, 9vw, 8rem)' }}>
+          <div className="font-display leading-none tabular-nums mt-1" style={{ fontSize: 'clamp(3rem, 6.5vw, 6rem)' }}>
             {fmt(totalPledged)}
           </div>
-          <div className="text-zinc-400 text-lg mt-1">
+          <div className="text-zinc-400 text-base mt-1">
             of <span className="text-white font-bold">{fmt(GOAL)}</span> meters
           </div>
 
@@ -220,21 +220,17 @@ export default function PledgePage() {
         </div>
 
         {/* Scan to join */}
-        <div className="shrink-0 text-center rounded-2xl px-7 py-6" style={{ background: '#0d0d0d', border: `2px solid ${BRAND.darkRed}` }}>
+        <div className="shrink-0 text-center rounded-2xl px-6 py-4 flex flex-col justify-center" style={{ background: '#0d0d0d', border: `2px solid ${BRAND.darkRed}` }}>
           {qr ? (
-            <img src={qr} alt="Scan to pledge your meters" className="w-52 h-52 rounded-lg" />
+            <img src={qr} alt="Scan to pledge your meters" className="w-44 h-44 rounded-lg mx-auto" />
           ) : (
-            <div className="w-52 h-52 rounded-lg" style={{ background: '#161616' }} />
+            <div className="w-44 h-44 rounded-lg mx-auto" style={{ background: '#161616' }} />
           )}
-          <div className="font-display uppercase text-2xl mt-4 leading-tight max-w-[15rem]">
+          <div className="font-display uppercase text-xl mt-3 leading-tight max-w-[14rem] mx-auto">
             Scan to pledge your meters
           </div>
-          <div className="text-sm text-zinc-300 mt-2.5 max-w-[15rem] leading-relaxed">
-            Point your phone camera at this code. Put in your name and how many meters you
-            will do in September.
-          </div>
-          <div className="text-xs text-zinc-500 mt-2 max-w-[15rem] leading-relaxed">
-            Pledge whatever is honest for you — big or small, it all goes on the road.
+          <div className="text-xs text-zinc-400 mt-2 max-w-[14rem] mx-auto leading-relaxed">
+            Point your phone camera here. Put in your name and how many meters you will do.
           </div>
         </div>
       </div>
