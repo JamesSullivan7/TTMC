@@ -29,7 +29,32 @@ There is no router library — `src/main.tsx` checks the path. `vercel.json` rew
 - **Today vs. our best day** replaces a deadline as the source of urgency. The room races its own history, which is the point of having no leaderboard.
 - **Daily recap** each morning, **Replay the journey** (~50s, built for the finish party), and **TV mode** for the gym screen.
 
-The map is a static SVG (`d3-geo` `albersUsa` + `us-atlas` state shapes) that scales to any screen. No WebGL, no camera, no render loop, no network call — it has to sit on a TV for a month unattended.
+The map is a static SVG (`d3-geo` `albersUsa` + `us-atlas` state shapes) that scales
+to any screen. No WebGL, no camera, no render loop, no network call — it has to sit
+on a TV for a month unattended.
+
+**A state fills in once the road reaches it**, tinted by the act that got you there:
+dark red for the Mother Road, brand red for the Long Haul, pink for the Run Home —
+the same three tones as the act bars underneath. Twenty states across the month, so
+the country slowly becomes a record of how the journey was made rather than just how
+far it got. `src/stateCrossings.ts` holds that data and is generated:
+
+```
+node scripts/state-crossings.mjs      # re-run whenever the route changes
+```
+
+A test recomputes it from the real geometry and fails if the committed file is stale,
+because route data and data derived from it drift apart silently — reversing the route
+once already proved that.
+
+What motion there is comes from SVG `<animate>` rather than React: the road ahead
+drifts forward so the direction of travel is obvious at a glance, the last 700 km
+glows, and the next stop pulses. The browser runs all of it on the compositor, so
+nothing re-renders and nothing burns battery on a machine casting all day.
+
+The look is tuned by the block of constants at the top of `src/MapView.tsx` —
+`LIT_STRENGTH` is the first dial to reach for if the states want to be bolder or
+quieter.
 
 ## Keys
 

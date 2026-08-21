@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { GOAL, MILESTONES, ROUTE, crossedMilestones, fmtKm } from './config'
+import { ACTS, GOAL, MILESTONES, ROUTE, crossedMilestones, fmtKm } from './config'
+import { STATE_CROSSINGS } from './stateCrossings'
 import { locationLabel, positionAt } from './geo'
 import { MACHINES, machineUnit, toMeters } from '../convex/machines'
 
@@ -50,6 +51,38 @@ describe('route data', () => {
       return { name: ms.name, days: gap }
     }).filter((g) => g.days > 2)
     expect(gaps).toEqual([])
+  })
+})
+
+describe('state crossings', () => {
+  it('still match the route', async () => {
+    // The map tints states from a generated file. Reversing the route once
+    // already proved that route data and derived data drift apart silently, so
+    // this recomputes from the actual geometry and fails if the committed file
+    // is stale. Fix by running: node scripts/state-crossings.mjs
+    const { computeCrossings } = await import('../scripts/state-crossings.mjs')
+    const fresh = computeCrossings()
+    expect(STATE_CROSSINGS.map((c) => `${c.name}@${c.m}`)).toEqual(
+      fresh.map((c: { name: string; m: number }) => `${c.name}@${c.m}`)
+    )
+  })
+
+  it('starts in Oklahoma at zero and stays inside the route', () => {
+    expect(STATE_CROSSINGS[0].name).toBe('Oklahoma')
+    expect(STATE_CROSSINGS[0].m).toBe(0)
+    expect(STATE_CROSSINGS[STATE_CROSSINGS.length - 1].m).toBeLessThan(GOAL)
+  })
+
+  it('are in ascending order', () => {
+    const out = STATE_CROSSINGS.filter((c, i) => i > 0 && c.m <= STATE_CROSSINGS[i - 1].m)
+    expect(out.map((o) => o.name)).toEqual([])
+  })
+
+  it('give every act states to colour', () => {
+    for (const act of ACTS) {
+      const inAct = STATE_CROSSINGS.filter((c) => c.m >= act.from && c.m < act.to)
+      expect(inAct.length, `${act.name} has no states`).toBeGreaterThan(0)
+    }
   })
 })
 
