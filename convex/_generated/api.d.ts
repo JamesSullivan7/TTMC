@@ -9,6 +9,7 @@
  */
 
 import type * as machines from "../machines.js";
+import type * as people from "../people.js";
 import type * as worldTour from "../worldTour.js";
 
 import type {
@@ -19,6 +20,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   machines: typeof machines;
+  people: typeof people;
   worldTour: typeof worldTour;
 }>;
 
