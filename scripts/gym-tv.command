@@ -14,7 +14,7 @@
 #  everyone for a month. Members log from their phones via the QR codes.
 # ──────────────────────────────────────────────────────────────────────────
 
-SITE="https://tt-cross-country.vercel.app"
+SITE="https://tt-cross-country.vercel.app/tv"
 
 cat <<'BANNER'
 

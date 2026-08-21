@@ -9,7 +9,8 @@ import './index.css'
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string)
 
 // Three surfaces, three audiences, no router library:
-//   /      the gym TV and anyone watching
+//   /      anyone watching, and the trainer computer
+//   /tv    the gym TV — display layout, locked, nothing to log in to
 //   /log   a member's phone, reached by scanning a machine's QR code
 //   /qr    a trainer printing those QR codes, once
 //
@@ -19,6 +20,8 @@ function Route() {
   const path = window.location.pathname.replace(/\/+$/, '')
   if (path === '/log') return <LogPage />
   if (path === '/qr') return <QrPage />
+  // The gym TV, usually a cast tab: display layout, locked, no trainer UI.
+  if (path === '/tv') return <App castMode />
   return <App />
 }
 

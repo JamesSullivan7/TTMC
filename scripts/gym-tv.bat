@@ -13,7 +13,7 @@ REM  and a trainer session would park an entry form and a Reset button on
 REM  the wall for a month. Members log from their phones via the QR codes.
 REM ─────────────────────────────────────────────────────────────────────────
 
-set SITE=https://tt-cross-country.vercel.app
+set SITE=https://tt-cross-country.vercel.app/tv
 
 REM Chrome first, then Edge, then whatever the machine's default browser is.
 set CHROME="%ProgramFiles%\Google\Chrome\Application\chrome.exe"

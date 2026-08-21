@@ -12,7 +12,8 @@ Every meter someone rows is a meter of road. There is no map scale and nothing h
 
 | URL | Who | What |
 |---|---|---|
-| `/` | the gym TV, and anyone watching | the map, the milestone feed, per-machine totals |
+| `/` | anyone watching, and the trainer computer | the map, the milestone feed, per-machine totals |
+| `/tv` | the gym TV, usually a cast tab | the display layout, locked — no trainer UI, nothing to log in to |
 | `/log` | a member's phone | log your own meters, reached by scanning a machine's QR |
 | `/qr` | a trainer, once | print the QR cards to tape on the machines |
 
@@ -125,26 +126,23 @@ A milestone with no `img` is **not** broken. `Celebration` confirms the photo lo
 
 ## The gym display
 
-It is a website — there is nothing to install on the gym computer. Open the site
-and press **TV mode**.
+Cast a tab, or open it on a machine wired to the TV. Either way use:
 
-Double-clickable launchers that do it properly — full screen, no address bar,
-and the screen kept awake:
+**https://tt-cross-country.vercel.app/tv**
 
-| | |
-|---|---|
-| macOS | `scripts/gym-tv.command` |
-| Windows | `scripts/gym-tv.bat` |
+That route is the display layout and nothing else. It cannot show the entry
+form, the testing tools or the Reset button even on a machine that is logged in
+as a trainer, there is no way out of it by accident, and it comes back correctly
+on its own if the tab reloads. Use it rather than `/` plus the TV mode button.
 
-Copy the one you need onto that machine. The Mac one also runs `caffeinate` so
-the display never blanks; `killall caffeinate` releases it.
+Casting a tab sends the page without browser chrome, so `/tv` does not ask for
+fullscreen — there is nothing to hide. If you are driving the TV directly rather
+than casting, press F11 (or Ctrl+Cmd+F on a Mac).
 
-**Do not log in as a trainer on the display machine.** It is the wall screen, and
-a trainer session parks an entry form and a Reset button in front of the whole
-gym for a month. Members log from their own phones via the QR codes.
-
-If the TV is a second display rather than a mirror, move the browser window onto
-it before going full screen — kiosk mode opens wherever the browser already was.
+Whatever is casting has to stay awake. On a Mac, `caffeinate -dis` in a Terminal
+does it; `killall caffeinate` releases it. There are double-clickable launchers
+in `scripts/` for both platforms that handle this and open kiosk mode:
+`gym-tv.command` for macOS, `gym-tv.bat` for Windows.
 
 ## Notes for whoever works on this next
 

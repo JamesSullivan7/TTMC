@@ -156,13 +156,19 @@ function RecapOverlay({
   )
 }
 
-export default function App() {
+// `castMode` is the /tv route: the display layout, locked. No trainer login,
+// no entry form, no way out — so a tab being cast to the gym TV cannot end up
+// showing an entry form and a Reset button to the whole room, and comes back
+// correctly on its own if the tab reloads. It does not ask for fullscreen,
+// because casting a tab sends the page content without browser chrome anyway,
+// and a page cannot enter fullscreen without a click to authorise it.
+export default function App({ castMode = false }: { castMode?: boolean }) {
   const summary = useQuery(api.worldTour.getSummary)
   const verifyAdmin = useMutation(api.worldTour.verifyAdmin)
   const daily = useQuery(api.worldTour.getDaily)
-  const [tvMode, setTvMode] = useState(false)
+  const [tvMode, setTvMode] = useState(castMode)
   const [kiosk, setKiosk] = useState(
-    () => localStorage.getItem('tt-kiosk') === '1' && getAdminKey() !== ''
+    () => !castMode && localStorage.getItem('tt-kiosk') === '1' && getAdminKey() !== ''
   )
   const [celebQueue, setCelebQueue] = useState<Milestone[]>([])
   const [showRecap, setShowRecap] = useState(false)
@@ -224,6 +230,7 @@ export default function App() {
   // Fullscreen sync for TV mode
   useEffect(() => {
     const onFs = () => {
+      if (castMode) return
       if (!document.fullscreenElement) setTvMode(false)
     }
     document.addEventListener('fullscreenchange', onFs)
@@ -235,6 +242,7 @@ export default function App() {
     document.documentElement.requestFullscreen?.().catch(() => {})
   }
   function exitTvMode() {
+    if (castMode) return // /tv has nothing to exit to
     setTvMode(false)
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
   }
@@ -399,7 +407,7 @@ export default function App() {
       <div
         className="relative w-full"
         style={{ height: tvMode ? '72vh' : '58vh', background: '#050505' }}
-        onDoubleClick={tvMode ? exitTvMode : undefined}
+        onDoubleClick={tvMode && !castMode ? exitTvMode : undefined}
       >
         <MapView totalMeters={shownTotal} paceMeters={replaying ? 0 : pace ?? 0} />
 
@@ -567,7 +575,7 @@ export default function App() {
           </div>
         </div>
 
-        {tvMode && (
+        {tvMode && !castMode && (
           <button
             onClick={exitTvMode}
             className="absolute top-4 right-1/2 translate-x-1/2 text-zinc-700 text-xs uppercase tracking-widest hover:text-zinc-400"
