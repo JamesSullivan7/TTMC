@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
-import { BRAND, CHALLENGE_NAME, GOAL, fmt } from './config'
+import { BRAND, CHALLENGE_NAME, GOAL, fmt, shortName } from './config'
 import { getTrainerKey } from './keys'
 
 // The browsable version of the board. The TV cycles through names too fast to
@@ -115,7 +115,7 @@ export default function PledgesPage() {
               className="flex items-baseline justify-between gap-4 px-4 py-3"
               style={{ background: '#0d0d0d', borderTop: i ? '1px solid #161616' : undefined }}
             >
-              <span className="font-bold truncate">{p.name}</span>
+              <span className="font-bold truncate">{shortName(p.firstName, p.lastName)}</span>
               <span className="font-black tabular-nums shrink-0" style={{ color: BRAND.pink }}>
                 {fmt(p.pledgeMeters)}
               </span>

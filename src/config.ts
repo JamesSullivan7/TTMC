@@ -166,6 +166,15 @@ export function fmt(n: number) {
   return Math.round(n).toLocaleString('en-US')
 }
 
+// "Sam Okafor" on the screen becomes "Sam O." — it fits a narrow column, it
+// is how people actually refer to each other in a gym, and it keeps a full
+// name off a wall anyone can walk past. Trainer views keep the whole thing,
+// because telling two Sams apart is the entire point there.
+export function shortName(firstName: string, lastName: string): string {
+  const initial = lastName.trim().charAt(0).toUpperCase()
+  return initial ? `${firstName} ${initial}.` : firstName
+}
+
 export function fmtKm(meters: number) {
   return `${Math.round(meters / 1000).toLocaleString('en-US')} km`
 }
