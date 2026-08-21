@@ -5,7 +5,7 @@ import MapView from './MapView'
 import Celebration from './Celebration'
 import { EntryForm, RecentEntries, DemoTools } from './EntryPanel'
 import { downloadShareCard } from './shareCard'
-import { clearAdminKey, getAdminKey, setAdminKey } from './adminKey'
+import { clearTrainerKey, getTrainerKey, setTrainerKey } from './keys'
 import {
   ACTS,
   actAt,
@@ -164,11 +164,11 @@ function RecapOverlay({
 // and a page cannot enter fullscreen without a click to authorise it.
 export default function App({ castMode = false }: { castMode?: boolean }) {
   const summary = useQuery(api.worldTour.getSummary)
-  const verifyAdmin = useMutation(api.worldTour.verifyAdmin)
+  const verifyTrainer = useMutation(api.worldTour.verifyTrainer)
   const daily = useQuery(api.worldTour.getDaily)
   const [tvMode, setTvMode] = useState(castMode)
   const [kiosk, setKiosk] = useState(
-    () => !castMode && localStorage.getItem('tt-kiosk') === '1' && getAdminKey() !== ''
+    () => !castMode && localStorage.getItem('tt-kiosk') === '1' && getTrainerKey() !== ''
   )
   const [celebQueue, setCelebQueue] = useState<Milestone[]>([])
   const [showRecap, setShowRecap] = useState(false)
@@ -250,20 +250,20 @@ export default function App({ castMode = false }: { castMode?: boolean }) {
   // The key is checked by the server, not compared against a bundled constant,
   // so a wrong key cannot be discovered by reading the site's source.
   async function trainerLogin() {
-    const entered = window.prompt('Trainer key:')
+    const entered = window.prompt('Trainer PIN:')
     if (entered === null) return
     const key = entered.trim()
     try {
-      await verifyAdmin({ key })
-      setAdminKey(key)
+      await verifyTrainer({ key })
+      setTrainerKey(key)
       localStorage.setItem('tt-kiosk', '1')
       setKiosk(true)
     } catch {
-      window.alert('That key was not accepted.')
+      window.alert('That PIN was not accepted.')
     }
   }
   function trainerLock() {
-    clearAdminKey()
+    clearTrainerKey()
     localStorage.removeItem('tt-kiosk')
     setKiosk(false)
   }

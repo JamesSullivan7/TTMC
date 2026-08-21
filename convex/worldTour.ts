@@ -24,12 +24,23 @@ function dayKey(creationTime: number): string {
 //
 // This app has no user accounts by design (no names, no leaderboard), and the
 // Convex deployment URL ships inside the client bundle — so anything callable
-// is callable by anyone who opens the site. Destructive operations therefore
-// check a shared key that lives ONLY in the deployment's environment and is
-// typed in by a trainer on demand. It is never bundled, never committed.
+// is callable by anyone who opens the site. Access is therefore shared keys,
+// held ONLY in the deployment's environment. None is ever bundled or committed.
 //
-//   npx convex env set ADMIN_KEY <value>          (dev)
-//   npx convex env set ADMIN_KEY <value> --prod   (production)
+// Three tiers, because they protect very different things:
+//
+//   LOG_TOKEN    members. Rides in the machine QR codes. Log meters, nothing else.
+//   TRAINER_PIN  trainers. Short and memorable, typed at the gym many times a
+//                day: log on anyone's behalf, undo a mistake, print QR cards.
+//   ADMIN_KEY    long and random. Wiping or fabricating the challenge, only.
+//
+// The split exists because TRAINER_PIN is four digits. That is the right
+// trade for something trainers type constantly — but it is 10,000 guesses
+// against a public endpoint, so it must not be able to erase a month of work.
+// Nobody needs reset or simulate during a challenge; those keep the long key.
+//
+//   npx convex env set TRAINER_PIN 6426 --prod
+//   npx convex env set ADMIN_KEY <long random> --prod
 //
 function requireAdmin(key: string) {
   const expected = process.env.ADMIN_KEY
@@ -39,23 +50,39 @@ function requireAdmin(key: string) {
   if (key !== expected) throw new Error('Not authorized')
 }
 
+// A trainer, or an admin — admins can do everything a trainer can.
+function requireTrainer(key: string) {
+  const pin = process.env.TRAINER_PIN
+  const admin = process.env.ADMIN_KEY
+  if (pin && key === pin) return
+  if (admin && key === admin) return
+  throw new Error('Not authorized')
+}
+
 // Trainer login: succeeds or throws. The client stores the key on success so
-// trainers only type it once per device.
-export const verifyAdmin = mutation({
+// a trainer only types the PIN once per device.
+export const verifyTrainer = mutation({
   args: { key: v.string() },
   handler: async (_ctx, { key }) => {
-    requireAdmin(key)
+    requireTrainer(key)
     return true
   },
 })
 
+// Whether this key can also reach the destructive tools — so the UI can show
+// or hide them honestly instead of offering buttons that will be refused.
+export const isAdmin = query({
+  args: { key: v.string() },
+  handler: async (_ctx, { key }) => key !== '' && key === process.env.ADMIN_KEY,
+})
+
 // The QR codes carry the log token, so a trainer needs to see it to print
-// them. Admin-gated: this is the one place the token is ever handed to a
-// client, and only to a device that already proved it has the trainer key.
+// them. Trainer-gated: the token is strictly lower privilege than the PIN, so
+// there is nothing gained by holding it back from someone who already has one.
 export const getLogToken = query({
   args: { key: v.string() },
   handler: async (_ctx, { key }) => {
-    requireAdmin(key)
+    requireTrainer(key)
     return process.env.LOG_TOKEN ?? null
   },
 })
@@ -75,10 +102,12 @@ export const getLogToken = query({
 //   npx convex env set LOG_TOKEN <value> --prod
 //
 function requireLogAccess(key: string) {
-  const admin = process.env.ADMIN_KEY
   const logToken = process.env.LOG_TOKEN
-  if (admin && key === admin) return
   if (logToken && key === logToken) return
+  const pin = process.env.TRAINER_PIN
+  if (pin && key === pin) return
+  const admin = process.env.ADMIN_KEY
+  if (admin && key === admin) return
   throw new Error('Not authorized')
 }
 
@@ -167,7 +196,7 @@ export const logEntry = mutation({
 export const deleteEntry = mutation({
   args: { id: v.id('entries'), key: v.string() },
   handler: async (ctx, { id, key }) => {
-    requireAdmin(key)
+    requireTrainer(key)
     await ctx.db.delete(id)
   },
 })

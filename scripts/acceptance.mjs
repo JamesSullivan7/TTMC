@@ -1,11 +1,12 @@
 // End-to-end acceptance check against a LIVE deployment.
 //
-//   node scripts/acceptance.mjs <ADMIN_KEY> <LOG_TOKEN>
+//   node scripts/acceptance.mjs <ADMIN_KEY> <LOG_TOKEN> <TRAINER_PIN>
 //
 // Writes a handful of real entries and then resets, so only run it against
 // a deployment nobody is mid-challenge on. Recover the keys with:
 //   npx convex env get ADMIN_KEY --prod
 //   npx convex env get LOG_TOKEN --prod
+//   npx convex env get TRAINER_PIN --prod
 //
 // It checks the permission tiers actually separate, that the Assault Bike
 // converts miles, that no key leaks into the shipped bundle, and that a
@@ -14,6 +15,7 @@ const CONVEX = 'https://utmost-gopher-81.convex.cloud'
 const SITE = 'https://tt-cross-country.vercel.app'
 const ADMIN = process.argv[2]
 const LOG = process.argv[3]
+const PIN = process.argv[4]
 
 let pass = 0, fail = 0
 const fails = []
@@ -43,8 +45,20 @@ check('LOG token CAN log', ok(await mut('logEntry', { machine: 'Row', amount: 10
 check('LOG token cannot reset', denied(await mut('resetChallenge', { key: LOG })))
 check('LOG token cannot simulate', denied(await mut('simulateDay', { key: LOG })))
 check('LOG token cannot read itself back', denied(await qry('getLogToken', { key: LOG })))
-check('LOG token fails verifyAdmin', denied(await mut('verifyAdmin', { key: LOG })))
-check('ADMIN key passes verifyAdmin', ok(await mut('verifyAdmin', { key: ADMIN })))
+check('LOG token is not a trainer', denied(await mut('verifyTrainer', { key: LOG })))
+check('ADMIN key passes verifyTrainer', ok(await mut('verifyTrainer', { key: ADMIN })))
+
+// The trainer PIN is short enough to brute force, so what it CANNOT do
+// matters more than what it can.
+check('PIN logs in as trainer', ok(await mut('verifyTrainer', { key: PIN })))
+check('PIN can log meters', ok(await mut('logEntry', { machine: 'Row', amount: 500, key: PIN })))
+check('PIN can read the QR token', ok(await qry('getLogToken', { key: PIN })))
+check('PIN CANNOT reset the challenge', denied(await mut('resetChallenge', { key: PIN })))
+check('PIN CANNOT simulate a day', denied(await mut('simulateDay', { key: PIN })))
+const pinAdmin = await qry('isAdmin', { key: PIN })
+check('PIN does not report as admin', ok(pinAdmin) && pinAdmin.value === false)
+const keyAdmin = await qry('isAdmin', { key: ADMIN })
+check('ADMIN key reports as admin', ok(keyAdmin) && keyAdmin.value === true)
 check('ADMIN key CAN log', ok(await mut('logEntry', { machine: 'Ski', amount: 100, key: ADMIN })))
 const tok = await qry('getLogToken', { key: ADMIN })
 check('ADMIN key can read the log token', ok(tok) && tok.value === LOG)
@@ -82,6 +96,7 @@ for (const p of ['/', '/log', '/qr']) {
 const html = await fetch(SITE).then((r) => r.text())
 const js = await fetch(SITE + html.match(/\/assets\/index-[\w-]+\.js/)[0]).then((r) => r.text())
 check('bundle has NO admin key', !js.includes(ADMIN))
+check('bundle has NO trainer PIN', !js.includes("'" + PIN + "'") && !js.includes('"' + PIN + '"'))
 check('bundle has NO log token', !js.includes(LOG))
 check('bundle points at PROD convex', js.includes('utmost-gopher-81'))
 check('bundle has no DEV convex', !js.includes('fine-eagle-220'))

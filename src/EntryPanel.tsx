@@ -3,7 +3,7 @@ import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import { MACHINES, MACHINE_COLORS, BRAND, fmt, Machine, challengeDay } from './config'
 import { machineUnit, toMeters, unitAbbrev, unitLabel } from '../convex/machines'
-import { clearAdminKey, getAdminKey, getLogKey, isAuthError } from './adminKey'
+import { getTrainerKey, getLogKey, isAuthError } from './keys'
 import LogResult, { LogOutcome } from './LogResult'
 
 // Anything past this (in real meters) asks for confirmation before logging.
@@ -43,7 +43,7 @@ export function EntryForm() {
     setErrorMsg('')
     const before = summary?.totalJourney ?? 0
     try {
-      // The admin key on the gym computer, the log token on a member's phone.
+      // The trainer PIN on the gym computer, the log token on a member's phone.
       // The server accepts either — see requireLogAccess in worldTour.ts.
       const res = await logEntry({ machine, amount: n, key: getLogKey() })
       setAmount('')
@@ -135,44 +135,59 @@ export function EntryForm() {
   )
 }
 
+// Simulate and reset are the only two things the trainer PIN cannot do. A
+// four-digit PIN gets typed at the gym all day and is 10,000 guesses against a
+// public endpoint — fine for logging and undo, not for erasing the month. So
+// these ask for the admin key at the moment they are used, and deliberately do
+// not remember it: walking away from an unlocked gym computer must not leave
+// the ability to wipe the challenge sitting there.
 export function DemoTools() {
   const simulateDay = useMutation(api.worldTour.simulateDay)
   const resetChallenge = useMutation(api.worldTour.resetChallenge)
+  const trainerKey = getTrainerKey()
+  const admin = useQuery(api.worldTour.isAdmin, trainerKey ? { key: trainerKey } : 'skip')
   const [busy, setBusy] = useState(false)
 
-  async function run(fn: () => Promise<unknown>, confirmMsg?: string) {
+  async function run(fn: (key: string) => Promise<unknown>, confirmMsg?: string) {
     if (confirmMsg && !window.confirm(confirmMsg)) return
+
+    let key = trainerKey
+    if (!admin) {
+      const entered = window.prompt('This one needs the admin key, not the trainer PIN:')
+      if (entered === null) return
+      key = entered.trim()
+    }
+
     setBusy(true)
     try {
-      await fn()
+      await fn(key)
     } catch (err) {
       window.alert(
         isAuthError(err)
-          ? 'That trainer key is no longer valid — lock and log in again.'
+          ? 'That key was not accepted.'
           : 'That did not go through. Try again.'
       )
-      if (isAuthError(err)) clearAdminKey()
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <div className="flex items-center gap-3 text-xs">
+    <div className="flex items-center gap-3 text-xs flex-wrap">
       <span className="text-zinc-600 uppercase tracking-widest">Testing tools</span>
       <button
         disabled={busy}
-        onClick={() => run(() => simulateDay({ key: getAdminKey() }))}
+        onClick={() => run((key) => simulateDay({ key }))}
         className="px-3 py-1.5 rounded-lg font-bold uppercase tracking-wider text-zinc-300 hover:text-white transition-colors disabled:opacity-40"
         style={{ background: '#141414', border: '1px solid #2a2a2a' }}
       >
-        Simulate a day (~1.35M m)
+        Simulate a day (~273k m)
       </button>
       <button
         disabled={busy}
         onClick={() =>
           run(
-            () => resetChallenge({ key: getAdminKey() }),
+            (key) => resetChallenge({ key }),
             'Wipe ALL entries and reset the challenge to zero?'
           )
         }
@@ -181,6 +196,9 @@ export function DemoTools() {
       >
         Reset to zero
       </button>
+      {admin === false && (
+        <span className="text-zinc-600">These two ask for the admin key.</span>
+      )}
     </div>
   )
 }
@@ -217,7 +235,7 @@ export function RecentEntries() {
                 {new Date(e.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
               </span>
               <button
-                onClick={() => deleteEntry({ id: e.id, key: getAdminKey() })}
+                onClick={() => deleteEntry({ id: e.id, key: getTrainerKey() })}
                 className="text-zinc-600 hover:text-red-400 px-1"
                 title="Undo this entry"
               >

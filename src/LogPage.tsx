@@ -17,7 +17,7 @@ import {
 import { machineUnit, toMeters, unitAbbrev, unitLabel } from '../convex/machines'
 import { locationLabel } from './geo'
 import { downloadShareCard } from './shareCard'
-import { getLogKey, getLogToken, setLogToken } from './adminKey'
+import { getLogKey, getLogToken, setLogToken } from './keys'
 
 // The member-facing page, reached by scanning the QR on a machine. Everything
 // here is one-handed and sweaty-thumbed: big targets, no navigation, no map,

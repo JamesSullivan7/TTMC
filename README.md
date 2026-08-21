@@ -33,24 +33,38 @@ The map is a static SVG (`d3-geo` `albersUsa` + `us-atlas` state shapes) that sc
 
 ## Keys
 
-Two tiers, both living only in the Convex deployment environment. Neither is ever in the bundle or the repo.
+Three tiers, all held ONLY in the Convex deployment environment. None is ever
+in the bundle or the repo.
 
-| | `LOG_TOKEN` | `ADMIN_KEY` |
-|---|---|---|
-| who has it | any member who scanned a QR | trainers |
-| log meters | ✅ | ✅ |
-| undo / reset / simulate | ❌ | ✅ |
-| read the log token back | ❌ | ✅ |
+| | `LOG_TOKEN` | `TRAINER_PIN` | `ADMIN_KEY` |
+|---|---|---|---|
+| who has it | any member who scanned a QR | every trainer | you |
+| log meters, for anyone | ✅ | ✅ | ✅ |
+| undo an entry | ❌ | ✅ | ✅ |
+| print the QR cards | ❌ | ✅ | ✅ |
+| reset / simulate | ❌ | ❌ | ✅ |
+
+Anyone not logged in can see everything — the map, the totals, the milestones —
+and change nothing.
 
 ```
-npx convex env set ADMIN_KEY <value> --prod
-npx convex env set LOG_TOKEN <value> --prod
-npx convex env get ADMIN_KEY --prod        # recover one
+npx convex env set TRAINER_PIN 6426 --prod
+npx convex env set ADMIN_KEY <long random> --prod
+npx convex env set LOG_TOKEN <long random> --prod
+npx convex env get TRAINER_PIN --prod        # recover one
 ```
 
-`LOG_TOKEN` rides in the QR URL, so you cannot get it by reading the site's source — you have to have stood in the gym and pointed a camera at a machine. It is a deliberately modest bar: it is not protecting money, it is stopping a stranger who guessed the URL from spraying the total. A leaked QR costs you some junk entries, not the month.
+**Why the PIN cannot reset.** Four digits is the right trade for something
+trainers type at the gym all day — but it is 10,000 guesses against a public
+endpoint, so it must not be able to erase a month of 182 people's work. Reset
+and simulate keep the long key, and the UI asks for it at the moment it is
+needed rather than caching it, so an unlocked gym computer left unattended
+cannot wipe the challenge.
 
-`/log` stores the token then strips it from the address bar, so a screenshot does not leak it.
+`LOG_TOKEN` rides in the QR URL, so you cannot get it by reading the site's
+source — you have to have stood in the gym and pointed a camera at a machine.
+A leaked QR costs you some junk entries, not the month. `/log` stores the token
+then strips it from the address bar, so a screenshot does not leak it.
 
 ## Machines and units
 
@@ -160,11 +174,11 @@ in `scripts/` for both platforms that handle this and open kiosk mode:
 ## Checking a live deployment
 
 ```
-npm run acceptance -- <ADMIN_KEY> <LOG_TOKEN>
+npm run acceptance -- <ADMIN_KEY> <LOG_TOKEN> <TRAINER_PIN>
 ```
 
-36 checks against the running site and its Convex deployment: that the two key
-tiers genuinely separate, that input validation holds, that the Assault Bike
+44 checks against the running site and its Convex deployment: that the three key
+tiers genuinely separate — in particular that the four-digit trainer PIN cannot reset or simulate — that input validation holds, that the Assault Bike
 converts miles, that neither key leaks into the shipped bundle, and that a burst
 of 30 concurrent logs produces no write conflicts.
 

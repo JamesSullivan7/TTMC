@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import { useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import { BRAND, CHALLENGE_NAME, MACHINES, MACHINE_COLORS, Machine } from './config'
-import { getAdminKey } from './adminKey'
+import { getTrainerKey } from './keys'
 
 // Printable QR cards, one per machine. A trainer opens this on the gym
-// computer (already unlocked with the trainer key), hits print, and tapes one
+// computer (already unlocked with the trainer PIN), hits print, and tapes one
 // card to each machine. That is the whole distribution mechanism for member
 // self-logging.
 //
@@ -14,8 +14,8 @@ import { getAdminKey } from './adminKey'
 // person, on one computer.
 
 export default function QrPage() {
-  const adminKey = getAdminKey()
-  const token = useQuery(api.worldTour.getLogToken, adminKey ? { key: adminKey } : 'skip')
+  const trainerKey = getTrainerKey()
+  const token = useQuery(api.worldTour.getLogToken, trainerKey ? { key: trainerKey } : 'skip')
   const [codes, setCodes] = useState<Record<string, string>>({})
   const [failed, setFailed] = useState(false)
 
@@ -45,7 +45,7 @@ export default function QrPage() {
     }
   }, [token])
 
-  if (!adminKey) {
+  if (!trainerKey) {
     return (
       <Shell>
         <p className="text-zinc-400">
@@ -81,7 +81,7 @@ export default function QrPage() {
         </h1>
         <p className="text-sm text-zinc-600 mt-2">
           Print these and tape one to each machine. Anyone who scans one can log their own
-          meters — they never see this page, and they never need the trainer key.
+          meters — they never see this page, and they never need the trainer PIN.
         </p>
         <button
           onClick={() => window.print()}
