@@ -71,12 +71,12 @@ function useAnimatedNumber(target: number, ms = 1400) {
 
 const BAR_LABELS: { m: number; label: string }[] = [
   { m: 0, label: 'Tulsa' },
-  { m: 591_000, label: 'St. Louis' },
-  { m: 2_035_000, label: 'NYC' },
-  { m: 3_179_000, label: 'Chicago' },
-  { m: 4_657_000, label: 'Denver' },
-  { m: 6_205_000, label: 'LA' },
-  { m: 7_924_000, label: 'Amarillo' },
+  { m: 549_000, label: 'Amarillo' },
+  { m: 2_269_000, label: 'LA' },
+  { m: 3_816_000, label: 'Denver' },
+  { m: 5_294_000, label: 'Chicago' },
+  { m: 6_438_000, label: 'NYC' },
+  { m: 7_883_000, label: 'St. Louis' },
   { m: 8_473_348, label: 'Tulsa' },
 ]
 

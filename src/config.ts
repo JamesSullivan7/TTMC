@@ -1,19 +1,34 @@
 // ── Challenge configuration ─────────────────────────────────────────────────
-// Tulsa -> New York -> Los Angeles -> Tulsa, 8,473 km of real road.
+// Tulsa -> Los Angeles -> New York -> Tulsa, 8,473 km of real road.
 //
 // Route length and MULTIPLIER (convex/worldTour.ts) are one decision, not two:
 // the gym's output is the fixed input at ~273,000 real meters a day. This route
 // takes 31.0 gym days at MULTIPLIER = 1 — which is why there is no longer any
 // map scale at all. Every meter someone rows is a meter down the road.
+//
+// Driven westbound first, so the gym leaves town on Route 66 — which runs
+// through Tulsa — and reaches its end at the Santa Monica Pier. The distance is
+// identical either way round; the story is not.
 export const GOAL = 8_473_348
 
 // Challenge name — header, TV title, and share cards read this.
 export const CHALLENGE_NAME = 'Cross Country'
 
-// Date window. null = open-ended: no countdown, no day counter, no pace ghost,
-// no "day N of N" on share cards. Set { start, days } once the dates are
-// decided and all of that lights back up on its own.
-export const CHALLENGE_WINDOW: { start: Date; days: number } | null = null
+// September 2026, the whole month. Parsed in local time, so this is midnight
+// on the 1st in Tulsa.
+//
+// Setting this turns the countdown, the day counter, the pace ghost, the
+// ahead/behind-pace badge and the day line on share cards back on. Set it to
+// null to run open-ended again.
+//
+// Worth knowing: 30 days at the calorie challenge's observed output
+// (~273,000 real meters a gym day) comes to 8,193,600 — about 3.3% short of
+// this route. The gym has to beat its own previous pace slightly, or it goes
+// to the wire. That is a choice, not an oversight.
+export const CHALLENGE_WINDOW: { start: Date; days: number } | null = {
+  start: new Date('2026-09-01T00:00:00'),
+  days: 30,
+}
 
 // Machines and their units live in convex/machines.ts so the server and the UI
 // cannot disagree about whether a number is meters or miles.
@@ -42,9 +57,9 @@ export const BRAND = {
 export type Act = { name: string; blurb: string; from: number; to: number }
 
 export const ACTS: Act[] = [
-  { name: 'The Run East', blurb: 'Tulsa to the Atlantic', from: 0, to: 2_035_000 },
-  { name: 'The Long Haul', blurb: 'New York to the Pacific', from: 2_035_000, to: 6_205_000 },
-  { name: 'The Road Home', blurb: 'Route 66, Santa Monica to Tulsa', from: 6_205_000, to: 8_473_348 },
+  { name: 'The Mother Road', blurb: 'Tulsa to the Pacific on Route 66', from: 0, to: 2_269_000 },
+  { name: 'The Long Haul', blurb: 'Los Angeles to the Atlantic', from: 2_269_000, to: 6_438_000 },
+  { name: 'The Run Home', blurb: 'New York back to Tulsa', from: 6_438_000, to: 8_473_348 },
 ]
 
 export function actAt(meters: number): { act: Act; index: number; pct: number } {
@@ -74,51 +89,52 @@ export type Milestone = {
 }
 
 export const MILESTONES: Milestone[] = [
-  // ── ACT I — THE RUN EAST · Tulsa to the Atlantic ──────────────────────────
-  { m: 8_848, name: 'Height of Mount Everest', img: '/postcards/everest.jpg', kind: 'mark', note: 'We are above the clouds, and it is still the first morning' },
+  // ── ACT I — THE MOTHER ROAD · Tulsa to the Pacific ────────────────────────
+  { m: 8_848, name: 'Height of Mount Everest', img: '/postcards/everest.jpg', kind: 'mark', note: 'Above the clouds, and it is still the first morning' },
   { m: 42_195, name: 'First marathon', img: '/postcards/first-marathon.jpg', kind: 'mark', note: 'The marathon counter starts ticking' },
   { m: 100_000, name: '100 km club', img: '/postcards/100km.jpg', kind: 'mark' },
-  { m: 168_000, name: 'Joplin, MO', img: '/postcards/joplin.jpg', kind: 'city', lat: 37.08, lng: -94.51, note: 'First city falls' },
-  { m: 277_000, name: 'Springfield, MO', img: '/postcards/springfield.jpg', kind: 'city', lat: 37.21, lng: -93.29 },
-  { m: 591_000, name: 'St. Louis', img: '/postcards/stlouis.jpg', kind: 'city', lat: 38.63, lng: -90.2, major: true, note: 'The Gateway Arch — and our first crossing of the Mississippi' },
-  { m: 961_000, name: 'Indianapolis', kind: 'city', lat: 39.77, lng: -86.16 },
+  { m: 157_000, name: 'Oklahoma City', img: '/postcards/okc.jpg', kind: 'city', lat: 35.47, lng: -97.52, note: 'First city falls — and everyone here has driven this bit' },
+  { m: 350_000, name: 'The 100th Meridian', kind: 'mark', note: 'The old dividing line. Everything from here is the West.' },
+  { m: 549_000, name: 'Amarillo', img: '/postcards/amarillo.jpg', kind: 'city', lat: 35.22, lng: -101.83, note: 'Cadillac Ranch — ten of them, nose down in a field' },
+  { m: 700_000, name: 'Into Mountain time', kind: 'mark', note: 'We just lost an hour' },
+  { m: 925_000, name: 'Santa Fe', img: '/postcards/santafe.jpg', kind: 'city', lat: 35.69, lng: -105.94 },
   { m: 1_000_000, name: 'First million meters', img: '/postcards/first-million.jpg', kind: 'mark' },
-  { m: 1_231_000, name: 'Columbus', kind: 'city', lat: 39.96, lng: -83.0 },
-  { m: 1_492_000, name: 'Pittsburgh', kind: 'city', lat: 40.44, lng: -79.996 },
+  { m: 1_019_000, name: 'Albuquerque', kind: 'city', lat: 35.08, lng: -106.65 },
+  { m: 1_300_000, name: 'The Painted Desert', kind: 'mark' },
+  { m: 1_527_000, name: 'The Grand Canyon', img: '/postcards/grand-canyon.jpg', kind: 'city', lat: 36.06, lng: -112.14, major: true, note: 'A detour worth taking' },
   { m: 1_609_344, name: '1,000 miles', img: '/postcards/1000-miles.jpg', kind: 'mark' },
-  { m: 1_700_000, name: 'Over the Appalachians', img: '/postcards/appalachian.jpg', kind: 'mark', note: 'The last mountains between us and the ocean' },
-  { m: 1_906_000, name: 'Philadelphia — the Rocky Steps', kind: 'city', lat: 39.95, lng: -75.17, major: true, note: 'Seventy-two steps. You know the ones.' },
-  { m: 2_035_000, name: 'NEW YORK CITY', img: '/postcards/nyc.jpg', kind: 'city', lat: 40.71, lng: -74.01, major: true, note: 'The Atlantic. Act one is done — now turn around.' },
+  { m: 1_632_000, name: 'Flagstaff', kind: 'city', lat: 35.2, lng: -111.65 },
+  { m: 1_850_000, name: 'The Colorado River at Needles', kind: 'mark' },
+  { m: 2_122_000, name: 'Barstow', kind: 'city', lat: 34.9, lng: -117.02, note: 'Kingman, Barstow, San Bernardino' },
+  { m: 2_269_000, name: 'LOS ANGELES', img: '/postcards/la.jpg', kind: 'city', lat: 34.05, lng: -118.24, major: true, note: 'Santa Monica Pier — the end of Route 66. The Pacific. Now turn around.' },
 
-  // ── ACT II — THE LONG HAUL · New York to the Pacific ──────────────────────
-  { m: 2_500_000, name: 'The shore of Lake Erie', kind: 'mark' },
-  { m: 2_684_000, name: 'Cleveland', img: '/postcards/cleveland.jpg', kind: 'city', lat: 41.5, lng: -81.69 },
-  { m: 2_900_000, name: 'Into the Central time zone', kind: 'mark', note: 'We just got an hour back' },
-  { m: 3_179_000, name: 'Chicago', img: '/postcards/chicago.jpg', kind: 'city', lat: 41.88, lng: -87.63, major: true, note: 'Where Route 66 begins — remember this for the way home' },
-  { m: 3_400_000, name: 'The Mississippi — crossed again', img: '/postcards/mississippi.jpg', kind: 'mark', note: 'Westbound this time. We are properly on our way home.' },
-  { m: 3_677_000, name: 'Des Moines', kind: 'city', lat: 41.59, lng: -93.62 },
-  { m: 3_873_000, name: 'Omaha', kind: 'city', lat: 41.26, lng: -95.93 },
-  { m: 4_050_000, name: 'The 100th Meridian', kind: 'mark', note: 'The old dividing line. Everything from here is the West.' },
-  { m: 4_236_674, name: 'HALFWAY', img: '/postcards/halfway.jpg', kind: 'mark', major: true, note: 'Middle of the country, middle of nowhere, middle of the challenge. Western Nebraska. Keep going.' },
-  { m: 4_657_000, name: 'Denver', kind: 'city', lat: 39.74, lng: -104.99, major: true, note: 'A mile above the sea' },
-  { m: 4_900_000, name: 'The Continental Divide', kind: 'mark', major: true, note: 'From here, every river runs to the Pacific' },
-  { m: 5_254_000, name: 'Salt Lake City', kind: 'city', lat: 40.76, lng: -111.89 },
-  { m: 5_500_000, name: 'Red rock country', kind: 'mark' },
-  { m: 5_837_000, name: 'Las Vegas', img: '/postcards/vegas.jpg', kind: 'city', lat: 36.17, lng: -115.14 },
-  { m: 6_205_000, name: 'LOS ANGELES', img: '/postcards/la.jpg', kind: 'city', lat: 34.05, lng: -118.24, major: true, note: 'Santa Monica Pier — the end of Route 66. Both oceans, done. Now drive it home.' },
+  // ── ACT II — THE LONG HAUL · Los Angeles to the Atlantic ──────────────────
+  { m: 2_636_000, name: 'Las Vegas', img: '/postcards/vegas.jpg', kind: 'city', lat: 36.17, lng: -115.14 },
+  { m: 2_900_000, name: 'Red rock country', kind: 'mark' },
+  { m: 3_220_000, name: 'Salt Lake City', kind: 'city', lat: 40.76, lng: -111.89 },
+  { m: 3_500_000, name: 'The Continental Divide', kind: 'mark', major: true, note: 'From here, every river runs to the Atlantic' },
+  { m: 3_816_000, name: 'Denver', kind: 'city', lat: 39.74, lng: -104.99, major: true, note: 'A mile above the sea' },
+  { m: 4_236_674, name: 'HALFWAY', img: '/postcards/halfway.jpg', kind: 'mark', major: true, note: 'Middle of the country, middle of nowhere, middle of the challenge. Keep going.' },
+  { m: 4_600_000, name: 'Omaha', kind: 'city', lat: 41.26, lng: -95.93 },
+  { m: 4_796_000, name: 'Des Moines', kind: 'city', lat: 41.59, lng: -93.62 },
+  { m: 5_000_000, name: 'The Mississippi River', img: '/postcards/mississippi.jpg', kind: 'mark', note: 'The big one. We cross it again on the way home.' },
+  { m: 5_294_000, name: 'Chicago', img: '/postcards/chicago.jpg', kind: 'city', lat: 41.88, lng: -87.63, major: true, note: 'The other end of Route 66. We left town on this road — here is where it starts.' },
+  { m: 5_600_000, name: 'The shore of Lake Erie', kind: 'mark' },
+  { m: 5_789_000, name: 'Cleveland', img: '/postcards/cleveland.jpg', kind: 'city', lat: 41.5, lng: -81.69 },
+  { m: 6_000_000, name: '6 million meters', kind: 'mark' },
+  { m: 6_438_000, name: 'NEW YORK CITY', img: '/postcards/nyc.jpg', kind: 'city', lat: 40.71, lng: -74.01, major: true, note: 'The Atlantic. Both oceans, done. Everything from here is the way home.' },
 
-  // ── ACT III — THE ROAD HOME · Route 66 back to Tulsa ──────────────────────
-  { m: 6_351_000, name: 'Barstow', kind: 'city', lat: 34.9, lng: -117.02, note: 'Kingman, Barstow, San Bernardino' },
-  { m: 6_600_000, name: 'The Colorado River at Needles', kind: 'mark' },
-  { m: 6_841_000, name: 'Flagstaff', kind: 'city', lat: 35.2, lng: -111.65 },
-  { m: 6_946_000, name: 'The Grand Canyon', img: '/postcards/grand-canyon.jpg', kind: 'city', lat: 36.06, lng: -112.14, major: true, note: 'A detour worth taking' },
-  { m: 7_150_000, name: 'The Painted Desert', kind: 'mark' },
-  { m: 7_455_000, name: 'Albuquerque', kind: 'city', lat: 35.08, lng: -106.65 },
-  { m: 7_548_000, name: 'Santa Fe', img: '/postcards/santafe.jpg', kind: 'city', lat: 35.69, lng: -105.94 },
-  { m: 7_924_000, name: 'Amarillo', img: '/postcards/amarillo.jpg', kind: 'city', lat: 35.22, lng: -101.83, note: 'Cadillac Ranch — ten of them, nose down in a field' },
+  // ── ACT III — THE RUN HOME · New York to Tulsa ────────────────────────────
+  { m: 6_568_000, name: 'Philadelphia — the Rocky Steps', kind: 'city', lat: 39.95, lng: -75.17, major: true, note: 'Seventy-two steps. You know the ones.' },
+  { m: 6_800_000, name: 'Over the Appalachians', img: '/postcards/appalachian.jpg', kind: 'mark', note: 'The last mountains standing between us and home' },
+  { m: 6_981_000, name: 'Pittsburgh', kind: 'city', lat: 40.44, lng: -79.996 },
+  { m: 7_242_000, name: 'Columbus', kind: 'city', lat: 39.96, lng: -83.0 },
+  { m: 7_512_000, name: 'Indianapolis', kind: 'city', lat: 39.77, lng: -86.16 },
+  { m: 7_883_000, name: 'St. Louis', img: '/postcards/stlouis.jpg', kind: 'city', lat: 38.63, lng: -90.2, major: true, note: 'The Gateway Arch, and the Mississippi crossed again — westbound, homeward' },
   { m: 8_000_000, name: '8 million meters', kind: 'mark' },
-  { m: 8_316_000, name: 'Oklahoma City', img: '/postcards/okc.jpg', kind: 'city', lat: 35.47, lng: -97.52, major: true, note: 'Almost home. Everyone in this room has driven the rest.' },
-  { m: 8_373_348, name: '100 KM TO GO', kind: 'mark', major: true },
+  { m: 8_196_000, name: 'Springfield, MO', img: '/postcards/springfield.jpg', kind: 'city', lat: 37.21, lng: -93.29 },
+  { m: 8_306_000, name: 'Joplin, MO', img: '/postcards/joplin.jpg', kind: 'city', lat: 37.08, lng: -94.51, note: 'Back on Route 66. Last stop before home.' },
+  { m: 8_373_348, name: '100 KM TO GO', kind: 'mark', major: true, note: 'Everyone in this room has driven the rest of it' },
   { m: 8_473_348, name: 'TULSA. HOME.', kind: 'finish', lat: 36.15, lng: -95.99, major: true, note: 'Coast to coast to coast. 8,473 kilometers. 200 marathons. WE DID IT.' },
 ]
 

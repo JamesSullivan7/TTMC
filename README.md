@@ -1,6 +1,8 @@
 # Tulsa Training — Cross Country
 
-A collective gym challenge. The whole gym drives one route together, cardio meter by cardio meter: **Tulsa → New York → Los Angeles → Tulsa, 8,473,348 meters.** No names, no leaderboard — one gym, one road.
+A collective gym challenge. The whole gym drives one route together, cardio meter by cardio meter: **Tulsa → Los Angeles → New York → Tulsa, 8,473,348 meters, through September 2026.** No names, no leaderboard — one gym, one road.
+
+Westbound first, so the gym leaves town on Route 66 — which runs through Tulsa — and reaches the end of it at the Santa Monica Pier. The distance is the same either way round; the story is not.
 
 **Live:** https://tt-cross-country.vercel.app
 
@@ -67,13 +69,22 @@ The gym's output is the fixed input, not the route. From the calorie challenge (
 
 Route length and `MULTIPLIER` are one decision, not two. This route is short enough that the journey is 1:1 with real meters, which is why the old silent ×5 "tailwind" is gone.
 
-41 milestones, averaging one every 0.76 gym days, with no gap larger than 1.70 — so no day the gym is open passes without something happening.
+42 milestones, averaging one every 0.74 gym days, with no gap larger than 1.60 — so no day the gym is open passes without something happening.
 
-### Dates are optional
+### The 30 days are tight on purpose
 
-`CHALLENGE_WINDOW` in `src/config.ts` is `null`, so the challenge is **open-ended** — it runs until the route is finished. In that mode the app hides the countdown, the "Day N of N" counter, the pace ghost, the ahead/behind-pace badge, and the day line on share cards.
+September is 30 days. At the calorie challenge's observed output the gym would cover 8,193,600 m — **3.3% short of the route.**
 
-Set it to `{ start: new Date('...'), days: N }` and every one of those turns back on by itself. Nothing else needs touching.
+| | |
+|---|---|
+| Needed per gym day | 282,445 m |
+| Managed last time | 273,120 m |
+| Per athlete (182) | ~1,552 m a day |
+| **Uplift required** | **+3.4%** |
+
+That is a real margin, not a rounding error, and it is deliberate. The gym has to beat its own previous pace slightly or the last week gets interesting. If that turns out to be the wrong call, the honest lever is the route, not the multiplier — cut a landmark or two rather than quietly inflating meters.
+
+`CHALLENGE_WINDOW` in `src/config.ts` drives the countdown, the "Day N of N" counter, the pace ghost, the ahead/behind-pace badge, and the day line on share cards. Set it to `null` to run open-ended instead; everything above hides itself.
 
 ## Running it
 
@@ -100,7 +111,7 @@ By hand: `npx convex deploy`, set both keys with `npx convex env set ... --prod`
 
 ## Postcards
 
-Each milestone can have a photo behind its celebration, at `public/postcards/<file>.jpg`. **20 of the 41 are in place.**
+Each milestone can have a photo behind its celebration, at `public/postcards/<file>.jpg`. **20 of the 42 are in place.** Reversing the route direction cost none of them — the cities are the same, only the order changed.
 
 ```
 bash scripts/postcards.sh

@@ -149,8 +149,13 @@ describe('crossedMilestones', () => {
   })
 
   it('always includes the milestone actually landed on', () => {
-    const all = crossedMilestones(0, 2_035_000)
-    expect(all[all.length - 1].name).toBe('NEW YORK CITY')
+    // Deliberately not a hardcoded meter mark — the route gets redrawn, and a
+    // test that has to be edited every time it does is testing the route
+    // rather than the collapsing rule.
+    for (const target of [MILESTONES[3], MILESTONES[Math.floor(MILESTONES.length / 2)], MILESTONES[MILESTONES.length - 1]]) {
+      const all = crossedMilestones(0, target.m)
+      expect(all[all.length - 1].name).toBe(target.name)
+    }
   })
 
   it('does not collapse two or fewer', () => {
