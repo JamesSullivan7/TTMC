@@ -13,7 +13,16 @@ export default defineSchema({
     // neither.
     input: v.optional(v.number()),
     unit: v.optional(v.string()),
-  }),
+
+    // Who did it. Optional on purpose: a trainer with five people queued at
+    // the desk must never be blocked from logging because a name will not
+    // resolve. Unattributed meters still move the gym down the road, they
+    // just do not land on anybody's total.
+    //
+    // Indexed because per-person totals are read constantly once the lookup
+    // exists, and scanning every entry for each of 182 people would not hold.
+    personId: v.optional(v.id('people')),
+  }).index('by_person', ['personId']),
 
   // Rate limiting, deliberately spread over several rows. A limiter that read
   // recent `entries` would put those rows into every writer's read set — which

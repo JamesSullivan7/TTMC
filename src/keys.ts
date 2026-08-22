@@ -43,6 +43,24 @@ export function getLogKey(): string {
   return getTrainerKey() || getLogToken()
 }
 
+// ── Whose phone this is ─────────────────────────────────────────────────────
+// Set when somebody pledges from this device, so logging in September does not
+// ask them who they are every single time. A phone belongs to one person; the
+// gym computer deliberately does not set this, because it belongs to everyone.
+const PERSON_KEY = 'tt-person'
+
+export function getPersonId(): string {
+  return localStorage.getItem(PERSON_KEY) ?? ''
+}
+
+export function setPersonId(id: string) {
+  localStorage.setItem(PERSON_KEY, id)
+}
+
+export function clearPersonId() {
+  localStorage.removeItem(PERSON_KEY)
+}
+
 // A stored key can stop working if it is rotated on the deployment. When that
 // happens, drop the device back to member view rather than leaving dead buttons.
 export function isAuthError(err: unknown): boolean {

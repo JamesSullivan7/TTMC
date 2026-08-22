@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import { BRAND, CHALLENGE_NAME, CHALLENGE_WINDOW, GOAL, fmt } from './config'
-import { setLogToken } from './keys'
+import { setLogToken, setPersonId } from './keys'
 
 // Reached by scanning the code on the gym TV. One job: claim your meters.
 //
@@ -78,6 +78,8 @@ export default function JoinPage() {
     setError('')
     try {
       const res = await pledge({ firstName: first, lastName: last, meters: amount })
+      // So September does not ask them who they are every single time.
+      setPersonId(res.id as unknown as string)
       setDone({ name: res.name, pledgeMeters: res.pledgeMeters, already: res.alreadyPledged })
     } catch (err: any) {
       const raw = String(err?.message ?? '')

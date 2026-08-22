@@ -152,10 +152,24 @@ export const logEntry = mutation({
   // `amount` is the raw number off the machine's screen, in that machine's own
   // unit. Conversion to meters happens here, server-side, so nothing
   // downstream ever has to wonder what unit it is holding.
-  args: { machine: v.string(), amount: v.number(), key: v.optional(v.string()) },
-  handler: async (ctx, { machine, amount, key }) => {
+  args: {
+    machine: v.string(),
+    amount: v.number(),
+    key: v.optional(v.string()),
+    // Who did it. Optional so a trainer with a queue at the desk is never
+    // blocked by a name that will not resolve — see the note in schema.ts.
+    personId: v.optional(v.id('people')),
+  },
+  handler: async (ctx, { machine, amount, key, personId }) => {
     requireLogAccess(key ?? '')
     await checkRateLimit(ctx)
+
+    // A stale personId from a phone whose person was merged or removed must
+    // not take the whole entry down with it — drop the attribution, keep the
+    // meters.
+    let person = null
+    if (personId) person = await ctx.db.get(personId)
+
     const unit = machineUnit(machine)
     if (unit === null) throw new Error('Unknown machine')
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -187,9 +201,14 @@ export const logEntry = mutation({
       journeyMeters,
       input: amount,
       unit,
+      personId: person ? person._id : undefined,
     })
 
-    return { journeyMeters, meters: Math.round(meters) }
+    return {
+      journeyMeters,
+      meters: Math.round(meters),
+      personName: person ? person.name : null,
+    }
   },
 })
 
@@ -275,15 +294,24 @@ export const getRecent = query({
   args: {},
   handler: async (ctx) => {
     const entries = await ctx.db.query('entries').order('desc').take(8)
-    return entries.map((e) => ({
-      id: e._id,
-      machine: e.machine,
-      meters: e.meters,
-      journeyMeters: e.journeyMeters,
-      input: e.input ?? null,
-      unit: e.unit ?? null,
-      at: e._creationTime,
-    }))
+    // At most eight lookups, so resolving names here rather than denormalising
+    // them onto the entry — a copied name would drift the moment somebody is
+    // renamed or two duplicates are merged.
+    return Promise.all(
+      entries.map(async (e) => {
+        const person = e.personId ? await ctx.db.get(e.personId) : null
+        return {
+          id: e._id,
+          machine: e.machine,
+          meters: e.meters,
+          journeyMeters: e.journeyMeters,
+          input: e.input ?? null,
+          unit: e.unit ?? null,
+          personName: person ? person.name : null,
+          at: e._creationTime,
+        }
+      })
+    )
   },
 })
 

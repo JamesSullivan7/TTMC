@@ -4,6 +4,7 @@ import { api } from '../convex/_generated/api'
 import { MACHINES, MACHINE_COLORS, BRAND, fmt, Machine, challengeDay } from './config'
 import { machineUnit, toMeters, unitAbbrev, unitLabel } from '../convex/machines'
 import { getTrainerKey, getLogKey, isAuthError } from './keys'
+import PersonPicker, { Pickable } from './PersonPicker'
 import LogResult, { LogOutcome } from './LogResult'
 
 // Anything past this (in real meters) asks for confirmation before logging.
@@ -14,6 +15,8 @@ export function EntryForm() {
   // The running total comes from this live subscription rather than from the
   // mutation, which no longer reads it — see the note in convex/worldTour.ts.
   const summary = useQuery(api.worldTour.getSummary)
+  const people = useQuery(api.people.listPeople)
+  const [person, setPerson] = useState<Pickable | null>(null)
   const [machine, setMachine] = useState<string>('')
   const [amount, setAmount] = useState('')
   const [status, setStatus] = useState<'idle' | 'saving' | 'done'>('idle')
@@ -45,7 +48,12 @@ export function EntryForm() {
     try {
       // The trainer PIN on the gym computer, the log token on a member's phone.
       // The server accepts either — see requireLogAccess in worldTour.ts.
-      const res = await logEntry({ machine, amount: n, key: getLogKey() })
+      const res = await logEntry({
+        machine,
+        amount: n,
+        key: getLogKey(),
+        personId: (person?.id as any) ?? undefined,
+      })
       setAmount('')
       setLastLogged(res.journeyMeters)
       setOutcome({
@@ -70,6 +78,16 @@ export function EntryForm() {
   return (
     <>
       <form onSubmit={handleSubmit} className="flex flex-wrap gap-2 items-end">
+        <div style={{ width: '13rem' }}>
+          <label className="block text-zinc-500 text-xs mb-1 uppercase tracking-wider">Who</label>
+          <PersonPicker
+            people={people}
+            value={person}
+            onChange={setPerson}
+            placeholder="Type a name…"
+            compact
+          />
+        </div>
         <div>
           <label className="block text-zinc-500 text-xs mb-1 uppercase tracking-wider">Machine</label>
           <select
@@ -115,7 +133,13 @@ export function EntryForm() {
           className="px-5 py-2 rounded-lg font-black text-sm uppercase tracking-wider transition-all disabled:opacity-40"
           style={{ background: status === 'done' ? '#10B981' : BRAND.red, color: '#fff' }}
         >
-          {status === 'saving' ? '...' : status === 'done' && lastLogged ? `+${fmt(lastLogged)} m!` : 'Log it'}
+          {status === 'saving'
+            ? '...'
+            : status === 'done' && lastLogged
+              ? `+${fmt(lastLogged)} m!`
+              : person
+                ? `Log for ${person.firstName}`
+                : 'Log it'}
         </button>
         {isMiles && status !== 'done' && (
           <span className="text-[11px] self-center" style={{ color: BRAND.pink }}>
@@ -221,7 +245,10 @@ export function RecentEntries() {
                 className="w-2 h-2 rounded-full shrink-0"
                 style={{ background: MACHINE_COLORS[e.machine as Machine] ?? '#666' }}
               />
-              <span className="text-zinc-300 w-28 truncate">{e.machine}</span>
+              <span className="text-zinc-300 w-24 truncate">{e.machine}</span>
+              <span className="w-28 truncate" style={{ color: e.personName ? '#fff' : '#52525b' }}>
+                {e.personName ?? 'no name'}
+              </span>
               {/* Show what was typed, so a trainer can check an entry against
                   the machine's screen without converting in their head. */}
               <span className="text-white font-bold tabular-nums">

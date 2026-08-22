@@ -194,6 +194,63 @@ export const importRoster = mutation({
   },
 })
 
+// Everyone, with what they have actually done set against what they said they
+// would do. One pass over the entries rather than a query per person: 182
+// people against a few thousand entries is nothing, and it means the whole
+// board arrives in a single subscription that updates itself.
+export const peopleWithTotals = query({
+  args: {},
+  handler: async (ctx) => {
+    const [people, entries] = await Promise.all([
+      ctx.db.query('people').collect(),
+      ctx.db.query('entries').collect(),
+    ])
+
+    const byPerson = new Map<string, { meters: number; count: number; byMachine: Record<string, number> }>()
+    let unattributed = 0
+    for (const e of entries) {
+      if (!e.personId) {
+        unattributed += e.meters
+        continue
+      }
+      const key = e.personId as unknown as string
+      let row = byPerson.get(key)
+      if (!row) {
+        row = { meters: 0, count: 0, byMachine: {} }
+        byPerson.set(key, row)
+      }
+      row.meters += e.meters
+      row.count += 1
+      row.byMachine[e.machine] = (row.byMachine[e.machine] ?? 0) + e.meters
+    }
+
+    return {
+      unattributed,
+      people: people
+        .map((p) => {
+          const row = byPerson.get(p._id as unknown as string)
+          const meters = row?.meters ?? 0
+          return {
+            id: p._id,
+            name: p.name,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            pledgeMeters: p.pledgeMeters,
+            pledgedAt: p.pledgedAt,
+            meters,
+            entries: row?.count ?? 0,
+            byMachine: row?.byMachine ?? {},
+            // Only meaningful once they have pledged; a roster entry sitting
+            // at zero would otherwise look like it had finished.
+            pledgePct: p.pledgeMeters > 0 ? Math.min(100, (meters / p.pledgeMeters) * 100) : 0,
+            keptPledge: p.pledgeMeters > 0 && meters >= p.pledgeMeters,
+          }
+        })
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    }
+  },
+})
+
 // Trainers can remove a bad entry — the safety valve that lets pledging stay
 // open in the first place.
 export const removePerson = mutation({

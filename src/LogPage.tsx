@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import {
@@ -17,7 +17,8 @@ import {
 import { machineUnit, toMeters, unitAbbrev, unitLabel } from '../convex/machines'
 import { locationLabel } from './geo'
 import { downloadShareCard } from './shareCard'
-import { getLogKey, getLogToken, setLogToken } from './keys'
+import { getLogKey, getLogToken, setLogToken, getPersonId, setPersonId } from './keys'
+import PersonPicker, { Pickable } from './PersonPicker'
 
 // The member-facing page, reached by scanning the QR on a machine. Everything
 // here is one-handed and sweaty-thumbed: big targets, no navigation, no map,
@@ -38,6 +39,18 @@ type Outcome = {
 export default function LogPage() {
   const logEntry = useMutation(api.worldTour.logEntry)
   const summary = useQuery(api.worldTour.getSummary)
+  const people = useQuery(api.people.listPeople)
+
+  // Whoever pledged on this phone. Kept so a member is not asked their name
+  // every time they finish on a machine — but changeable, because phones get
+  // handed to a friend.
+  const [person, setPerson] = useState<Pickable | null>(null)
+  const storedPersonId = getPersonId()
+  const knownPerson = useMemo(
+    () => (people ?? []).find((p) => (p.id as unknown as string) === storedPersonId) ?? null,
+    [people, storedPersonId]
+  )
+  const who = person ?? knownPerson
 
   const params = new URLSearchParams(window.location.search)
   const [machine, setMachine] = useState<string>(() => {
@@ -77,7 +90,12 @@ export default function LogPage() {
     // no longer reads the total, so that concurrent logs cannot conflict.
     const before = summary?.totalJourney ?? 0
     try {
-      const res = await logEntry({ machine, amount: n, key: getLogKey() })
+      const res = await logEntry({
+        machine,
+        amount: n,
+        key: getLogKey(),
+        personId: (who?.id as any) ?? undefined,
+      })
       const after = before + res.journeyMeters
       setOutcome({
         meters: res.meters,
@@ -219,7 +237,27 @@ export default function LogPage() {
           </div>
         ) : (
           <form onSubmit={submit} className="mt-7">
-            <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Which machine?</div>
+            {/* Whose meters these are. The phone already knows if they pledged
+                on it, so this is normally just a confirmation — but phones get
+                handed to a friend at the machine, so it stays changeable. */}
+            <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Who is logging?</div>
+            <PersonPicker
+              people={people}
+              value={who}
+              onChange={(p) => {
+                setPerson(p)
+                if (p) setPersonId(p.id as unknown as string)
+              }}
+              placeholder="Type your name…"
+            />
+            {!who && (
+              <div className="mt-2 text-xs text-zinc-600 leading-relaxed">
+                You can log without a name — the meters still count for the gym, they just
+                will not land on your total.
+              </div>
+            )}
+
+            <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2 mt-6">Which machine?</div>
             <div className="grid grid-cols-2 gap-2">
               {MACHINES.map((m) => {
                 const on = m === machine
