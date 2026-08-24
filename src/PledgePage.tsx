@@ -42,6 +42,16 @@ const DASH_SECONDS = 0.8 // one dash period; the map moves 24 units in 1.6s
 const DASH_TV = { on: 0.5, off: 0.7, unit: 'vw' }
 const DASH_PHONE = { on: 0.28, off: 0.39, unit: 'rem' }
 
+// ── Board text ──────────────────────────────────────────────────────────────
+// The board is read from across a gym, not from a desk. Zinc-400 (8.0:1) and
+// zinc-500 (4.2:1) are comfortable at arm's length and give up on a TV — and
+// the worst of it lands on the smallest type, the 0.6vw tracked-out labels.
+// So the wide layout puts every secondary line back to white and lets size
+// and letter-spacing carry the hierarchy instead of tone. The phone is held
+// at reading distance, so it keeps the grays.
+const SECONDARY = (big: boolean) => (big ? 'text-white' : 'text-zinc-400')
+const LABEL = (big: boolean) => (big ? 'text-white' : 'text-zinc-500')
+
 type DashScale = typeof DASH_TV
 
 // The unlit part of the track. The layer is deliberately larger than the
@@ -170,7 +180,7 @@ function Countdown({ start, big }: { start: Date; big: boolean }) {
           <div className="font-display leading-none tabular-nums" style={{ fontSize: big ? '3vw' : '2rem' }}>
             {String(val).padStart(2, '0')}
           </div>
-          <div className="uppercase tracking-[0.3em] text-zinc-500 mt-1" style={{ fontSize: big ? '0.6vw' : '0.6rem' }}>
+          <div className={`uppercase tracking-[0.3em] mt-1 ${LABEL(big)}`} style={{ fontSize: big ? '0.6vw' : '0.6rem' }}>
             {unit}
           </div>
         </div>
@@ -197,7 +207,7 @@ function ScanCard({ qr, size, big }: { qr: string | null; size: string; big: boo
         Scan to pledge your meters
       </div>
       <div
-        className="text-zinc-400 leading-relaxed mx-auto"
+        className={`leading-relaxed mx-auto ${SECONDARY(big)}`}
         style={{ fontSize: big ? '0.85vw' : '0.8rem', maxWidth: big ? '18vw' : '17rem', marginTop: big ? '0.5vw' : '0.5rem' }}
       >
         Point your phone camera here. Put in your name and how many meters you will do.
@@ -234,7 +244,7 @@ function Explainer({ big }: { big: boolean }) {
       <div className="font-display uppercase leading-none" style={{ fontSize: big ? '1.9vw' : '1.3rem' }}>
         This September the whole gym drives one road together
       </div>
-      <div className="text-zinc-400" style={{ fontSize: big ? '1vw' : '0.85rem', marginTop: big ? '0.6vw' : '0.6rem' }}>
+      <div className={SECONDARY(big)} style={{ fontSize: big ? '1vw' : '0.85rem', marginTop: big ? '0.6vw' : '0.6rem' }}>
         Tulsa <span style={{ color: BRAND.red }}>→</span> Los Angeles <span style={{ color: BRAND.red }}>→</span> New York{' '}
         <span style={{ color: BRAND.red }}>→</span> Tulsa · <span className="text-white font-bold">{fmt(GOAL)} meters</span> ·
         every meter you row, ski, bike or run moves us down the road
@@ -272,7 +282,7 @@ function Stat({ value, label, tint, big }: { value: string; label: string; tint?
       <div className="font-display leading-none" style={{ fontSize: big ? '2.3vw' : '1.6rem', color: tint }}>
         {value}
       </div>
-      <div className="uppercase tracking-[0.3em] text-zinc-500 mt-1" style={{ fontSize: big ? '0.62vw' : '0.55rem' }}>
+      <div className={`uppercase tracking-[0.3em] mt-1 ${LABEL(big)}`} style={{ fontSize: big ? '0.62vw' : '0.55rem' }}>
         {label}
       </div>
     </div>
@@ -431,7 +441,7 @@ export default function PledgePage() {
             <div className="font-display leading-none tabular-nums mt-[0.3vw]" style={{ fontSize: '6.5vw' }}>
               {fmt(totalPledged)}
             </div>
-            <div className="text-zinc-400 mt-[0.3vw]" style={{ fontSize: '1vw' }}>
+            <div className="text-white mt-[0.3vw]" style={{ fontSize: '1vw' }}>
               of <span className="text-white font-bold">{fmt(GOAL)}</span> meters
             </div>
             <div className="flex items-baseline justify-center gap-[2.5vw] mt-[1vw]">
@@ -449,7 +459,7 @@ export default function PledgePage() {
       </div>
 
       {roster && people.length === 0 && (
-        <div className="text-zinc-600 text-center pb-[1vw]" style={{ fontSize: '1.1vw' }}>
+        <div className="text-white text-center pb-[1vw]" style={{ fontSize: '1.1vw' }}>
           Nobody has pledged yet. Be the first — scan the code.
         </div>
       )}
