@@ -38,6 +38,24 @@ const milestones = config.slice(config.indexOf('MILESTONES'), config.indexOf('ex
 const all = [...milestones.matchAll(/\{[^{}]*name:\s*'([^']+)'[^{}]*\}/g)]
 const haveCount = all.filter((m) => /img:/.test(m[0])).length
 
+// Where each milestone falls on the road, so the list can be read as a set of
+// deadlines instead of a pile of homework.
+//
+// 273,120 m is the gym's own measured output for one day, from the calorie
+// challenge - the same figure the route was sized against. A 100,000-run
+// simulation of that pace lands at 96.7% of the route, so anything past day 30
+// only ever gets seen if the gym beats its previous pace. Those are marked.
+const PACE_PER_DAY = 273_120
+const CHALLENGE_DAYS = 30
+const meterFor = new Map(
+  [...milestones.matchAll(/\{[^{}]*?m:\s*([\d_]+),\s*name:\s*'([^']+)'[^{}]*\}/g)]
+    .map((m) => [m[2], Number(m[1].replace(/_/g, ''))])
+)
+const dayFor = (name) => {
+  const m = meterFor.get(name)
+  return m === undefined ? null : Math.ceil(m / PACE_PER_DAY)
+}
+
 const unsplash = (q) => `https://unsplash.com/s/photos/${encodeURIComponent(q.replace(/ /g, '-'))}`
 const pexels = (q) => `https://www.pexels.com/search/${encodeURIComponent(q)}/`
 const wikimedia = (q) =>
@@ -76,24 +94,38 @@ lines.push('check each one. Do not pull from Google Images.')
 lines.push('')
 lines.push('## The list')
 lines.push('')
-lines.push('| # | Milestone | Save as | Look for | Search |')
+lines.push('Ordered by when the gym reaches it, so the top of the list is the most urgent.')
+lines.push('')
+lines.push('| Due | Milestone | Save as | Look for | Search |')
 lines.push('|---|---|---|---|---|')
 
-todo.forEach((r, i) => {
-  const n = i + 1
-  if (r.kind === 'find') {
-    const search = `[Unsplash](${unsplash(r.q)}) · [Pexels](${pexels(r.q)}) · [Commons](${wikimedia(r.q)})`
-    lines.push(`| ${n} | ${r.name} | \`${r.file}\` | ${r.q} | ${search} |`)
-  } else if (r.kind === 'make') {
-    lines.push(
-      `| ${n} | ${r.name} | \`${r.file}\` | **Make this one.** A number card, not a photo — match \`public/postcards/halfway.jpg\`: big number, brand red \`#D93B58\` on near-black, Anton-ish type | — |`
-    )
-  } else {
-    lines.push(
-      `| ${n} | ${r.name} | \`${r.file}\` | **Shoot this one.** The gym and the crew. It fills the screen at 8,473,348 m, the moment the whole month lands — no stock photo can do it | — |`
-    )
-  }
-})
+todo
+  .slice()
+  .sort((a, b) => (meterFor.get(a.name) ?? 0) - (meterFor.get(b.name) ?? 0))
+  .forEach((r) => {
+    const d = dayFor(r.name)
+    const due =
+      d === null ? '—' : d > CHALLENGE_DAYS ? `**day ${d}** ⚑` : `day ${d}`
+    if (r.kind === 'find') {
+      const search = `[Unsplash](${unsplash(r.q)}) · [Pexels](${pexels(r.q)}) · [Commons](${wikimedia(r.q)})`
+      lines.push(`| ${due} | ${r.name} | \`${r.file}\` | ${r.q} | ${search} |`)
+    } else if (r.kind === 'make') {
+      lines.push(
+        `| ${due} | ${r.name} | \`${r.file}\` | **Generated, not photographed.** Run \`node scripts/backdrops.mjs\`. Do not print the number into it — Celebration already draws it on top | — |`
+      )
+    } else {
+      lines.push(
+        `| ${due} | ${r.name} | \`${r.file}\` | **Yours to shoot.** The gym and the crew. It fills the screen at 8,473,348 m, the moment the whole month lands — no stock photo can do it | — |`
+      )
+    }
+  })
+
+lines.push('')
+lines.push('⚑ **Past day 30.** A 100,000-run simulation of the gym\'s own measured pace')
+lines.push('(273,120 m a day, from the calorie challenge) finishes the route **0.35% of the**')
+lines.push('**time** — mean 96.7%. So anything flagged is only ever seen if the gym beats its')
+lines.push('previous pace. That is the route working as designed, and it means the finish')
+lines.push('photo is both the least likely to fire and the one that matters most if it does.')
 
 const by = (k) => todo.filter((r) => r.kind === k).length
 lines.push('')
