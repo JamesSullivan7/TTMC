@@ -11,6 +11,8 @@
 // It checks the permission tiers actually separate, that the Assault Bike
 // converts miles, that no key leaks into the shipped bundle, and that a
 // burst of concurrent logs produces no write conflicts.
+import { readdir, readFile } from 'node:fs/promises'
+
 const CONVEX = 'https://utmost-gopher-81.convex.cloud'
 const SITE = 'https://tt-cross-country.vercel.app'
 const ADMIN = process.argv[2]
@@ -33,8 +35,16 @@ async function qry(path, args) {
     body: JSON.stringify({ path: 'worldTour:' + path, args, format: 'json' }) })
   return { http: r.status, ...(await r.json()) }
 }
+// The two above hardcode the worldTour prefix. This one takes a full path, so
+// the people:* functions and the does-it-even-exist sweep can use it too.
+async function call(kind, path, args) {
+  const r = await fetch(CONVEX + '/api/' + kind, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, args, format: 'json' }) })
+  return { http: r.status, ...(await r.json()) }
+}
 const ok = (r) => r.status === 'success'
 const denied = (r) => r.status === 'error'
+const missing = (r) => JSON.stringify(r).includes('Could not find function')
 
 console.log('\n\x1b[1mA · PERMISSION MATRIX\x1b[0m')
 check('no key cannot log', denied(await mut('logEntry', { machine: 'Row', amount: 100 })))
@@ -109,6 +119,118 @@ const conflicts = res.filter((r) => JSON.stringify(r).includes('OptimisticConcur
 const succeeded = res.filter(ok).length
 check(N + ' concurrent logs: zero write conflicts', conflicts === 0, 'conflicts=' + conflicts)
 check(N + ' concurrent logs: ' + succeeded + '/' + N + ' landed', succeeded === N, succeeded + '/' + N)
+
+console.log('\n\x1b[1mG \u00b7 EVERY FUNCTION THE APP CALLS ANSWERS HERE\x1b[0m')
+// The check that was missing, and the reason it has to work this way.
+//
+// The Convex backend and the Vercel frontend deploy by SEPARATE commands, so
+// shipping a build that calls a function nobody deployed is one forgotten step
+// away - and it fails at a member's phone, not at deploy time.
+//
+// Existence cannot be probed negatively. Over the HTTP API a missing function
+// and a function that merely rejected your arguments are indistinguishable:
+// both answer {"status":"error","errorMessage":"... Server Error"} with HTTP
+// 200, and the "Could not find function" text appears only in the CLI. A check
+// looking for that string passes against a deployment missing every function
+// on this list, which is worse than having no check at all.
+//
+// So each one is called with arguments that MUST succeed. A success is proof
+// the function is deployed and answering.
+//
+// The list is derived from the source; the arguments are written by hand. Add
+// an api.x.y call to the app without adding a smoke for it here and this
+// section fails - which is the only thing that keeps a list like this honest.
+const srcDir = new URL('../src/', import.meta.url)
+const srcFiles = (await readdir(srcDir)).filter((f) => /\.tsx?$/.test(f) && !f.includes('.test.'))
+const referenced = new Set()
+for (const f of srcFiles) {
+  const text = await readFile(new URL(f, srcDir), 'utf8')
+  for (const m of text.matchAll(/api\.([a-zA-Z]+)\.([a-zA-Z]+)/g)) referenced.add(m[1] + ':' + m[2])
+}
+
+// A spare entry to hand to deleteEntry, so its smoke is a real round trip.
+// logEntry does not return the row it inserted, so the id comes back off the
+// recent list instead.
+await mut('logEntry', { machine: 'Row', amount: 250, key: LOG })
+const spareList = await qry('getRecent', {})
+const spareId = spareList.value?.[0]?.id
+
+const SMOKE = {
+  'people:listPeople':        ['query',    {}],
+  'people:peopleWithTotals':  ['query',    {}],
+  // A junk id must answer null rather than throwing - see section H.
+  'people:personStats':       ['query',    { id: 'smoke-probe' }],
+  'people:pledge':            ['mutation', { firstName: 'Smoke', lastName: 'Probe' + Date.now(), meters: 150000 }],
+  'worldTour:getSummary':     ['query',    {}],
+  'worldTour:getRecent':      ['query',    {}],
+  'worldTour:getDaily':       ['query',    {}],
+  'worldTour:getLogToken':    ['query',    { key: PIN }],
+  'worldTour:isAdmin':        ['query',    { key: ADMIN }],
+  'worldTour:verifyTrainer':  ['mutation', { key: PIN }],
+  'worldTour:logEntry':       ['mutation', { machine: 'Row', amount: 100, key: LOG }],
+  'worldTour:deleteEntry':    ['mutation', { id: spareId, key: PIN }],
+  'worldTour:simulateDay':    ['mutation', { key: ADMIN }],
+  'worldTour:resetChallenge': ['mutation', { key: ADMIN }],
+}
+
+const unsmoked = [...referenced].filter((r) => !SMOKE[r])
+check('every function the app calls has a smoke check', unsmoked.length === 0, unsmoked.join(', '))
+
+const smokePeople = []
+for (const path of [...referenced].sort()) {
+  const entry = SMOKE[path]
+  if (!entry) continue
+  const [kind, args] = entry
+  const r = await call(kind, path, args)
+  check('answers: ' + path, ok(r), JSON.stringify(r.errorMessage ?? '').slice(0, 90))
+  if (path === 'people:pledge' && r.value?.id) smokePeople.push(r.value.id)
+}
+
+// resetChallenge above cleared the entries. The people are ours to clear up,
+// because reset never touches people.
+for (const id of smokePeople) {
+  check('smoke person removed', ok(await call('mutation', 'people:removePerson', { id, key: PIN })))
+}
+
+
+console.log('\n\x1b[1mH \u00b7 PLEDGING, AND READING YOUR OWN METERS BACK\x1b[0m')
+check('anyone can read the roster', ok(await call('query', 'people:listPeople', {})))
+
+const TEST_FIRST = 'Acceptance'
+const TEST_LAST = 'Probe' + Date.now()
+const named = { firstName: TEST_FIRST, lastName: TEST_LAST }
+check('rejects a pledge under the floor',
+  denied(await call('mutation', 'people:pledge', { ...named, meters: 10 })))
+check('rejects a pledge over the cap',
+  denied(await call('mutation', 'people:pledge', { ...named, meters: 99000000 })))
+
+const made = await call('mutation', 'people:pledge', { ...named, meters: 150000 })
+check('a pledge lands', ok(made), JSON.stringify(made.value))
+const personId = made.value?.id
+
+// Pledges go up, never down: a mistyped small number must not be able to wipe
+// out a real commitment.
+const lowered = await call('mutation', 'people:pledge', { ...named, meters: 1000 })
+check('a lower pledge does not lower the total',
+  ok(lowered) && lowered.value?.pledgeMeters === 150000, JSON.stringify(lowered.value?.pledgeMeters))
+
+const stats = await call('query', 'people:personStats', { id: personId })
+check('personStats reads that person back, with no key',
+  ok(stats) && stats.value?.pledgeMeters === 150000, JSON.stringify(stats.value?.pledgeMeters))
+
+// The white-screen regression. A stored id outlives what it points at, and a
+// rejected argument is rethrown during render - a blank page on a member's
+// phone with no way out of it. It has to answer null, not error.
+const junk = await call('query', 'people:personStats', { id: 'not-an-id-at-all' })
+check('personStats answers null for a junk id rather than erroring',
+  ok(junk) && junk.value === null, JSON.stringify(junk.value ?? junk.errorMessage))
+
+// Leave nothing behind: resetChallenge clears entries, never people.
+if (personId) {
+  check('test person removed again',
+    ok(await call('mutation', 'people:removePerson', { id: personId, key: PIN })))
+}
+
 
 console.log('\n\x1b[1mF · CLEANUP\x1b[0m')
 const reset = await mut('resetChallenge', { key: ADMIN })

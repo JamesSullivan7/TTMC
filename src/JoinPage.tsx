@@ -11,7 +11,19 @@ import { setLogToken, setPersonId } from './keys'
 // own number instead, and the sum of those numbers is what the gym has
 // committed to the road.
 
-const TIERS = [25_000, 50_000, 100_000, 250_000]
+// Four numbers to tap, and your own if none of them is yours.
+//
+// These are ambitious against the arithmetic — an even share of the route
+// across 182 members is about 46,500, so the smallest button here is roughly
+// three times that. That is deliberate: the people actually signing up are
+// pledging far more than the old tiers suggested, and a button nobody picks is
+// not doing any work.
+//
+// Which is exactly why the custom field below is not a fallback. The gym has
+// members in their twenties and members in their seventies, and a row of large
+// round numbers anchors hard — somebody who can honestly do 30,000 has to be
+// able to say so without feeling they have picked the loser's option.
+const TIERS = [150_000, 250_000, 350_000, 500_000]
 
 export default function JoinPage() {
   const pledge = useMutation(api.people.pledge)
@@ -229,14 +241,24 @@ export default function JoinPage() {
             })}
           </div>
 
+          {/* Given as an equal choice rather than a fallback under the tiers.
+              Whatever is honest for you is the whole basis of pledging at all,
+              and it has to look like one of the options, not the way out. */}
+          <div className="flex items-center gap-3 my-3">
+            <div className="flex-1 h-px" style={{ background: '#2a2a2a' }} />
+            <span className="text-[10px] uppercase tracking-widest text-zinc-500">or your own number</span>
+            <div className="flex-1 h-px" style={{ background: '#2a2a2a' }} />
+          </div>
+
           <input
             type="number"
             inputMode="numeric"
             value={custom}
             onChange={(e) => { setCustom(e.target.value); setMeters(null) }}
-            placeholder="or type your own number"
-            className="mt-2 w-full bg-[#0d0d0d] text-white text-center rounded-xl px-4 py-3 focus:outline-none placeholder:text-zinc-600"
-            style={{ border: `1.5px solid ${custom ? BRAND.darkRed : '#2a2a2a'}` }}
+            placeholder="whatever is honest for you"
+            aria-label="Your own number of meters"
+            className="w-full bg-[#0d0d0d] text-white text-center rounded-xl px-4 py-4 font-black text-base focus:outline-none placeholder:text-zinc-600 placeholder:font-normal placeholder:text-sm"
+            style={{ border: `1.5px solid ${custom ? BRAND.red : '#2a2a2a'}` }}
           />
 
           <button
