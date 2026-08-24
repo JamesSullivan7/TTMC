@@ -20,6 +20,57 @@ import { getTrainerKey } from './keys'
 const PAGE_MS = 9000
 const PER_COLUMN = 14
 
+// ── The gauge ───────────────────────────────────────────────────────────────
+// The track used to be #161616 on a #050505 board: 1.13:1. Across a gym on a
+// panel that crushes its own blacks that is not a dark track, it is nothing —
+// and the unfilled part is the half of the story that says how far there is
+// to go. So it carries the map's own road-ahead treatment instead: dashes,
+// drifting the way the journey goes. Same colour, same 5:7 rhythm and the
+// same cadence as the dashed route in MapView, so the pre-season board and
+// the map that replaces it on the 1st speak the same language.
+//
+// TRACK_EDGE is the first dial to reach for: it is the hairline that makes
+// the tube read as a shape at distance. DASH_SECONDS slows the drift.
+const TRACK = '#141419' // the road not yet driven
+const TRACK_EDGE = '#2e2e38' // hairline, so the tube is a shape and not a smudge
+const DASH = 'rgba(255,255,255,0.32)' // MapView's road-ahead stroke, exactly
+const DASH_SECONDS = 0.8 // one dash period; the map moves 24 units in 1.6s
+
+// The dash geometry is 5:7 on both layouts — the map's strokeDasharray="5 7" —
+// but the board is sized in vw and the phone in rem, so the scale follows the
+// layout it is in rather than one number being wrong on one of them.
+const DASH_TV = { on: 0.5, off: 0.7, unit: 'vw' }
+const DASH_PHONE = { on: 0.28, off: 0.39, unit: 'rem' }
+
+type DashScale = typeof DASH_TV
+
+// The unlit part of the track. The layer is deliberately larger than the
+// track on the axis of travel: it slides exactly one dash period, and the
+// track's overflow-hidden clips the overhang, so the loop has no seam.
+function RoadAhead({ axis, scale }: { axis: 'up' | 'right'; scale: DashScale }) {
+  const { on, off, unit } = scale
+  const period = `${on + off}${unit}`
+  const bleed = axis === 'up'
+    ? { top: `-${period}`, bottom: `-${period}`, left: 0, right: 0 }
+    : { left: `-${period}`, right: `-${period}`, top: 0, bottom: 0 }
+
+  return (
+    <div
+      className={axis === 'up' ? 'road-ahead-up' : 'road-ahead-right'}
+      style={{
+        position: 'absolute',
+        ...bleed,
+        pointerEvents: 'none',
+        background: `repeating-linear-gradient(${axis === 'up' ? 'to top' : 'to right'}, transparent 0, transparent ${off}${unit}, ${DASH} ${off}${unit}, ${DASH} ${on + off}${unit})`,
+        // Read by the keyframes, so the slide distance and the dash period
+        // cannot drift apart.
+        ['--dash-period' as string]: period,
+        ['--dash-dur' as string]: `${DASH_SECONDS}s`,
+      } as React.CSSProperties}
+    />
+  )
+}
+
 function useIsNarrow() {
   const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 900px)').matches)
   useEffect(() => {
@@ -282,7 +333,11 @@ export default function PledgePage() {
             </div>
           </div>
 
-          <div className="relative h-3 rounded-full mt-5" style={{ background: '#161616' }}>
+          <div
+            className="relative h-3 rounded-full mt-5 overflow-hidden"
+            style={{ background: TRACK, boxShadow: `inset 0 0 0 1px ${TRACK_EDGE}` }}
+          >
+            <RoadAhead axis="right" scale={DASH_PHONE} />
             <div
               className="absolute left-0 top-0 h-full rounded-full transition-all duration-1000"
               style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${BRAND.darkRed}, ${BRAND.red}, ${BRAND.pink})` }}
@@ -353,7 +408,11 @@ export default function PledgePage() {
             <div className="font-black tabular-nums mb-[0.5vw]" style={{ fontSize: '0.7vw', color: BRAND.pink }}>
               {pct > 0 && pct < 1 ? '<1' : Math.round(pct)}%
             </div>
-            <div className="relative rounded-full overflow-hidden flex-1" style={{ width: '2.2vw', background: '#161616' }}>
+            <div
+              className="relative rounded-full overflow-hidden flex-1"
+              style={{ width: '2.2vw', background: TRACK, boxShadow: `inset 0 0 0 1px ${TRACK_EDGE}` }}
+            >
+              <RoadAhead axis="up" scale={DASH_TV} />
               <div
                 className="absolute bottom-0 left-0 right-0 rounded-full transition-all duration-1000"
                 style={{

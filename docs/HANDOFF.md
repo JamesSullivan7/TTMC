@@ -40,12 +40,34 @@ Dev deployment has its own separate values (same commands without `--prod`). A c
 
 ## Next up
 
-### Gauge bar colours
+### ~~Gauge bar colours~~ — done
 
-The vertical fill bar's track is `#161616` on a `#050505` background, so the **unfilled portion is nearly invisible** on the gym TV. Ideas and designs were requested before any change.
+The track was `#161616` on `#050505`: **1.13:1**, which is not a dark track on a gym
+TV, it is nothing. Five options were mocked at true board scale and James picked
+**road ahead**: the unfilled track now carries the map's dashed road, drifting the
+way the journey goes.
 
-- Lives in `src/PledgePage.tsx` (search `pct}%`). Its colours are currently inline; consider hoisting them into a labelled block the way `src/MapView.tsx` does.
-- The board is `h-screen` + `overflow-hidden` and sized in `vw`. **Do not reintroduce fixed px** — two separate rounds of layout bugs came from exactly that.
+- Colours live in a labelled `── The gauge ──` block at the top of `src/PledgePage.tsx`,
+  the way `src/MapView.tsx` does it. `TRACK_EDGE` is the first dial to reach for —
+  it is the hairline that makes the tube read as a shape at distance.
+- The dash colour, the 5:7 rhythm and the 0.8s cadence are **taken from the map's
+  road-ahead path** (`strokeDasharray="5 7"`, dashoffset 0→-24 over 1.6s). If that
+  changes, change both, or the two surfaces stop matching.
+- The drift is a `transform` on a layer that bleeds one dash period past the track,
+  clipped by `overflow-hidden` — so the loop has no seam at any track length, and it
+  stays on the compositor. Keyframes are in `src/index.css`; the slide distance reads
+  `--dash-period` off the element so it cannot drift apart from the gradient.
+- **`prefers-reduced-motion` stops the drift**, and that is fine: static dashes still
+  sit at 2.73:1 against the board, so the contrast fix does not depend on the motion.
+- The board is `h-screen` + `overflow-hidden` and sized in `vw`. **Do not reintroduce
+  fixed px** — two separate rounds of layout bugs came from exactly that. The dash
+  geometry is in `vw` for the TV and `rem` for the phone for the same reason.
+
+Still open, and deliberately not decided here: at 4.1% the fill is a smear no track
+colour fixes (a "waterline" cap was mocked and not built), and the tube measures
+pledges against the full 8,473,348 — so in August it is a near-empty tube on the one
+board whose job is to make signing up look like it is happening. That is a framing
+question, not a colour one.
 
 ### Badges
 

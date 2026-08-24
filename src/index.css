@@ -56,3 +56,21 @@ body {
   animation: confetti-fall linear infinite;
 }
 .pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+
+/* The gauge's road ahead. The layer slides exactly one dash period and the
+   track clips the overhang, so the loop has no seam at any track length.
+   Transform only, so it stays on the compositor like the rest of this board. */
+@keyframes road-ahead-up {
+  from { transform: translateY(0); }
+  to   { transform: translateY(calc(var(--dash-period) * -1)); }
+}
+@keyframes road-ahead-right {
+  from { transform: translateX(0); }
+  to   { transform: translateX(var(--dash-period)); }
+}
+.road-ahead-up    { animation: road-ahead-up var(--dash-dur) linear infinite; }
+.road-ahead-right { animation: road-ahead-right var(--dash-dur) linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .road-ahead-up, .road-ahead-right { animation: none; }
+}
