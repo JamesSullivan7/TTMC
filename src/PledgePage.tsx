@@ -81,13 +81,33 @@ function RoadAhead({ axis, scale }: { axis: 'up' | 'right'; scale: DashScale }) 
   )
 }
 
+const NARROW_QUERY = '(max-width: 900px)'
+
+// Which of the two layouts this is: the gym TV, or somebody's phone.
+//
+// Deliberately belt and braces. Getting stuck in the wrong one is not a
+// cosmetic bug — it is the phone layout on the gym TV for the rest of the
+// month, and nobody is going to be standing there to notice. Two things can
+// strand it, and each has its own guard:
+//
+//   the viewport moves between the first render and this effect — a cast tab
+//   is resized by the TV as it connects — and the change event fires into the
+//   gap where nothing is listening yet. Hence the sync() on mount.
+//
+//   the change event does not arrive at all. Hence resize as well, which is
+//   redundant in a healthy browser and free when it is not.
 function useIsNarrow() {
-  const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 900px)').matches)
+  const [narrow, setNarrow] = useState(() => window.matchMedia(NARROW_QUERY).matches)
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 900px)')
-    const on = () => setNarrow(mq.matches)
-    mq.addEventListener('change', on)
-    return () => mq.removeEventListener('change', on)
+    const mq = window.matchMedia(NARROW_QUERY)
+    const sync = () => setNarrow(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    window.addEventListener('resize', sync)
+    return () => {
+      mq.removeEventListener('change', sync)
+      window.removeEventListener('resize', sync)
+    }
   }, [])
   return narrow
 }
