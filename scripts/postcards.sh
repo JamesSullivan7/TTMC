@@ -271,7 +271,7 @@ if (( ${#PENDING[@]} == 0 )); then
 fi
 
 _clear
-printf '\n  %s%s of 21 postcards already done. %s to go.%s\n\n' "$BOLD" "$DONE_COUNT" "${#PENDING[@]}" "$RESET"
+printf '\n  %s%s of %s postcards already done. %s to go.%s\n\n' "$BOLD" "$DONE_COUNT" "${#WANTED[@]}" "${#PENDING[@]}" "$RESET"
 say "For each one: save a photo into $DIR with the exact filename shown,"
 say "and this will check it and wire it into the config for you."
 say ""
