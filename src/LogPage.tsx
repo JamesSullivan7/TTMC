@@ -17,7 +17,7 @@ import {
 import { machineUnit, toMeters, unitAbbrev, unitLabel } from '../convex/machines'
 import { locationLabel } from './geo'
 import { downloadShareCard } from './shareCard'
-import { getLogKey, getLogToken, setLogToken, getPersonId, setPersonId } from './keys'
+import { getLogKey, getLogToken, setLogToken, getPersonId, setPersonId, clearPersonId } from './keys'
 import PersonPicker, { Pickable } from './PersonPicker'
 
 // The member-facing page, reached by scanning the QR on a machine. Everything
@@ -51,6 +51,16 @@ export default function LogPage() {
     [people, storedPersonId]
   )
   const who = person ?? knownPerson
+
+  // A remembered id can outlive what it points at — a trainer removing a
+  // duplicate, a reset, or a phone that once opened the dev deployment. This
+  // page survives that on its own, because it resolves the id against the
+  // roster and falls back to asking. But it never cleared the dead value, so it
+  // asked again on every visit forever, and /me could not use it either. Only
+  // once the roster has actually arrived: an empty list is loading, not proof.
+  useEffect(() => {
+    if (storedPersonId && people && people.length > 0 && !knownPerson) clearPersonId()
+  }, [storedPersonId, people, knownPerson])
 
   const params = new URLSearchParams(window.location.search)
   const [machine, setMachine] = useState<string>(() => {
@@ -148,7 +158,14 @@ export default function LogPage() {
         <div className="text-sm text-zinc-400 -mt-1">meters down the road</div>
 
         <div className="mt-7 text-xl font-bold leading-snug max-w-sm">
-          {movedOn ? (
+          {to.done ? (
+            // The road has run out. There is no next stop to be closer to, and
+            // saying there is reads as broken at the one moment that matters.
+            <>
+              The gym is <span style={{ color: BRAND.red }}>home</span>. That is on top of the
+              whole road.
+            </>
+          ) : movedOn ? (
             <>
               {from.where} <span style={{ color: BRAND.red }}>→</span> {to.where}
             </>
@@ -159,7 +176,7 @@ export default function LogPage() {
             </>
           )}
         </div>
-        {to.toNext > 0 && (
+        {!to.done && to.toNext > 0 && (
           <div className="mt-2 text-sm text-zinc-500">
             {fmtKm(to.toNext)} to {to.nextStop}
           </div>
@@ -196,6 +213,21 @@ export default function LogPage() {
         >
           Log another
         </button>
+
+        {/* The only route into /me that does not require finding the printed
+            card again. This is also the moment it is worth most: they have just
+            finished, the number is fresh, and "what have I done altogether" is
+            the next question. Only offered when we know who they are — the page
+            has nothing to show otherwise. */}
+        {who && (
+          <a
+            href="/me"
+            className="mt-3 block w-full max-w-sm py-4 rounded-xl font-black text-sm uppercase tracking-widest text-center transition-opacity hover:opacity-80"
+            style={{ border: `1.5px solid ${BRAND.darkRed}`, color: BRAND.pink }}
+          >
+            All your meters
+          </a>
+        )}
 
         <div className="mt-6 text-xs text-zinc-600">
           The gym is at {fmt(outcome.totalAfter)} of {fmt(GOAL)} m

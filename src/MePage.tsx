@@ -12,6 +12,7 @@ import {
   fmtKm,
 } from './config'
 import { locationLabel } from './geo'
+import { nextBadge, volumeBadges } from './badges'
 import { getPersonId, setPersonId, clearPersonId, setLogToken } from './keys'
 import PersonPicker from './PersonPicker'
 
@@ -176,6 +177,9 @@ function Stats({ stats, onSwitch }: { stats: Stats; onSwitch: () => void }) {
             ))}
           </div>
 
+          <Section label="What you have to show for it" />
+          <Badges meters={meters} kept={keptPledge} pledgeMeters={pledgeMeters} />
+
           <Section label="All told" />
           <div className="grid grid-cols-3 gap-3 mt-3">
             <Tile value={String(entries)} label={entries === 1 ? 'session' : 'sessions'} />
@@ -194,6 +198,106 @@ function Stats({ stats, onSwitch }: { stats: Stats; onSwitch: () => void }) {
         Not {name.split(' ')[0]}? Change name
       </button>
     </div>
+  )
+}
+
+// Keeping your pledge sits above the volume tiers and is styled to outrank
+// them, because it is the only one every member can reach — each person set
+// their own number, so it means the same thing at 20,000 as at 500,000. Sizing
+// it by volume, or putting it in the same row as the tiers, would quietly turn
+// the one egalitarian achievement into another measure of output.
+function Badges({
+  meters,
+  kept,
+  pledgeMeters,
+}: {
+  meters: number
+  kept: boolean
+  pledgeMeters: number
+}) {
+  const tiers = volumeBadges(meters)
+  const next = nextBadge(meters)
+
+  return (
+    <div className="mt-3">
+      {pledgeMeters > 0 && (
+        <div
+          className="rounded-2xl px-4 py-4 flex items-center gap-3.5"
+          style={
+            kept
+              ? { border: `1.5px solid ${BRAND.red}`, background: 'rgba(217,59,88,0.09)' }
+              : { border: '1.5px solid #1c1c22' }
+          }
+        >
+          <Seal earned={kept} big />
+          <div className="min-w-0">
+            <div className="font-black text-[0.95rem]" style={{ color: kept ? BRAND.pink : '#a1a1aa' }}>
+              {kept ? 'You kept your pledge' : 'Your pledge'}
+            </div>
+            {/* Deliberately does not repeat the number to go — the pledge bar
+                above already counts that down, and saying it twice on one
+                screen makes the page feel like it is nagging. */}
+            <div className="text-zinc-400 text-xs mt-1 leading-relaxed">
+              {kept
+                ? `You said ${fmt(pledgeMeters)} and you did it. Same badge whatever the number — that is the point of it.`
+                : 'Everyone who gets to their own number gets this one, whatever they claimed.'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-2 mt-2">
+        {tiers.map(({ badge, earned }) => (
+          <div
+            key={badge.id}
+            className="rounded-xl px-3 py-2.5 flex items-center gap-2.5"
+            style={{ border: `1.5px solid ${earned ? BRAND.darkRed : '#16161c'}` }}
+            title={badge.blurb}
+          >
+            <Seal earned={earned} />
+            <div className="min-w-0">
+              <div
+                className="font-bold text-[0.8rem] truncate"
+                style={{ color: earned ? '#fff' : '#52525b' }}
+              >
+                {badge.name}
+              </div>
+              <div className="tabular-nums text-[0.62rem]" style={{ color: earned ? BRAND.pink : '#3f3f46' }}>
+                {fmt(badge.at)}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {next && meters > 0 && (
+        <div className="text-zinc-400 text-xs mt-3 text-center leading-relaxed">
+          <span className="text-white font-bold tabular-nums">{fmt(next.toGo)}</span> more to{' '}
+          <span style={{ color: BRAND.pink }}>{next.badge.name}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// A filled disc when earned, an empty ring when not. Deliberately not a tick or
+// a lock: a lock says "denied", and this is a road you are still on.
+function Seal({ earned, big = false }: { earned: boolean; big?: boolean }) {
+  const size = big ? '2.1rem' : '1.15rem'
+  return (
+    <span
+      className="shrink-0 rounded-full"
+      aria-hidden="true"
+      style={{
+        width: size,
+        height: size,
+        background: earned
+          ? `linear-gradient(135deg, ${BRAND.darkRed}, ${BRAND.red} 60%, ${BRAND.pink})`
+          : 'transparent',
+        border: earned ? 'none' : '1.5px solid #2a2a32',
+        boxShadow: earned ? `0 0 ${big ? '14px' : '8px'} rgba(217,59,88,0.45)` : 'none',
+      }}
+    />
   )
 }
 

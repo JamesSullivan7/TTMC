@@ -163,9 +163,19 @@ export default function JoinPage() {
 
         <form onSubmit={submit} className="mt-7">
           <div className="grid grid-cols-2 gap-2">
+            {/* htmlFor/id rather than a label that merely sits above the box.
+                Without the pairing a screen reader reads two unnamed text
+                fields, and tapping the word "First name" does not focus
+                anything — which on a phone is the obvious thing to try. */}
             <div>
-              <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-1.5">First name</label>
+              <label
+                htmlFor="join-first"
+                className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-1.5"
+              >
+                First name
+              </label>
               <input
+                id="join-first"
                 value={first}
                 onChange={(e) => setFirst(e.target.value)}
                 autoComplete="given-name"
@@ -174,8 +184,14 @@ export default function JoinPage() {
               />
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-1.5">Last name</label>
+              <label
+                htmlFor="join-last"
+                className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-1.5"
+              >
+                Last name
+              </label>
               <input
+                id="join-last"
                 value={last}
                 onChange={(e) => setLast(e.target.value)}
                 autoComplete="family-name"

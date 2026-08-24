@@ -58,7 +58,13 @@ export default function LogResult({
           Your {fmt(meters)} meters
         </div>
 
-        {movedOn ? (
+        {to.done ? (
+          // No next stop once the road has run out — see the note on
+          // locationLabel. This used to read "closer to Cross Country — complete".
+          <div className="mt-2 text-lg font-bold leading-snug text-white">
+            The gym is <span style={{ color: BRAND.red }}>home</span>. That is on top of the whole road.
+          </div>
+        ) : movedOn ? (
           <div className="mt-2 text-lg font-bold leading-snug text-white">
             {from.where} <span style={{ color: BRAND.red }}>→</span> {to.where}
           </div>
@@ -68,7 +74,7 @@ export default function LogResult({
           </div>
         )}
 
-        {to.toNext > 0 && (
+        {!to.done && to.toNext > 0 && (
           <div className="mt-1 text-sm text-zinc-400">
             {fmtKm(to.toNext)} to {to.nextStop}
           </div>
