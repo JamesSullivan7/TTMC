@@ -22,11 +22,22 @@ export function positionAt(meters: number): { lat: number; lng: number } {
 }
 
 // Human-readable location line: between which waypoints, distance to next.
-export function locationLabel(meters: number): { where: string; nextStop: string; toNext: number } {
+// `done` is explicit rather than left for each caller to infer from toNext === 0.
+// Three surfaces render nextStop — the member's phone, the trainer panel and the
+// TV — and every one of them read "3 km closer to Cross Country — complete" once
+// the road ran out, because "the next stop" has no meaning after the last one.
+// That is the finish, the moment the whole month is pointed at, so it is worth a
+// field rather than three guesses.
+export function locationLabel(meters: number): {
+  where: string
+  nextStop: string
+  toNext: number
+  done: boolean
+} {
   const total = Math.max(0, meters)
   const last = ROUTE[ROUTE.length - 1]
   if (total >= last.m) {
-    return { where: 'Home in Tulsa', nextStop: `${CHALLENGE_NAME} — complete`, toNext: 0 }
+    return { where: 'Home in Tulsa', nextStop: `${CHALLENGE_NAME} — complete`, toNext: 0, done: true }
   }
   let i = 0
   while (i < ROUTE.length - 1 && ROUTE[i + 1].m <= total) i++
@@ -37,5 +48,6 @@ export function locationLabel(meters: number): { where: string; nextStop: string
     where: total === 0 ? 'Tulsa — the start line' : `Past ${cleanName(a.name)}`,
     nextStop: cleanName(b.name),
     toNext: b.m - total,
+    done: false,
   }
 }

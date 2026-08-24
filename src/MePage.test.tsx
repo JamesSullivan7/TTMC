@@ -9,6 +9,8 @@ void convexReactMock
 
 import MePage from './MePage'
 
+const MACHINE_ORDER = ['Assault Bike', 'Row', 'Erg Bike', 'Ski', 'Assault Runner']
+
 const ROSTER = [
   { id: 'p1', name: 'Kim Tate', firstName: 'Kim', lastName: 'Tate', pledgeMeters: 45000, pledgedAt: 3 },
   { id: 'p2', name: 'Lou Marsh', firstName: 'Lou', lastName: 'Marsh', pledgeMeters: 120000, pledgedAt: 2 },
@@ -114,7 +116,10 @@ describe('what it tells you', () => {
   it('shows the machines heaviest first, with each share of the total', () => {
     setQuery('people:personStats', KIM)
     const { container } = render(<MePage />)
-    const names = [...container.querySelectorAll('.font-bold.truncate')].map((n) => n.textContent)
+    // Scoped to the machine rows: badge names also carry font-bold + truncate.
+    const names = [...container.querySelectorAll('.rounded-xl .font-bold.truncate')]
+      .map((n) => n.textContent)
+      .filter((n) => MACHINE_ORDER.includes(n))
     expect(names).toEqual(['Assault Bike', 'Row', 'Erg Bike', 'Ski', 'Assault Runner'])
     expect(screen.getByText(/5 sessions · 33% of your meters/)).toBeTruthy()
   })

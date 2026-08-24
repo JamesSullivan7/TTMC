@@ -233,3 +233,32 @@ describe('fmtKm', () => {
     expect(fmtKm(500)).toBe('1 km')
   })
 })
+
+// The finish. Three surfaces render `nextStop`, and every one of them read
+// "closer to Cross Country — complete" once the road ran out, because there is
+// no next stop after the last one. `done` exists so they can say something
+// true instead, at the one moment the whole month is pointed at.
+describe('the end of the road', () => {
+  it('is not done a meter before the finish', () => {
+    const l = locationLabel(GOAL - 1)
+    expect(l.done).toBe(false)
+    expect(l.toNext).toBeGreaterThan(0)
+  })
+
+  it('is done exactly at the finish', () => {
+    expect(locationLabel(GOAL).done).toBe(true)
+  })
+
+  it('stays done past it, because the gym keeps logging after arriving', () => {
+    const l = locationLabel(GOAL + 500_000)
+    expect(l.done).toBe(true)
+    expect(l.toNext).toBe(0)
+    expect(l.where).toBe('Home in Tulsa')
+  })
+
+  it('never reports a next stop to travel towards once done', () => {
+    for (const m of [GOAL, GOAL + 1, GOAL * 2]) {
+      expect(locationLabel(m).toNext).toBe(0)
+    }
+  })
+})
