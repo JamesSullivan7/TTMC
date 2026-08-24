@@ -208,7 +208,10 @@ export default function MapView({ totalMeters, paceMeters }: Props) {
           const fill = !lit
             ? LAND
             : mixToward(tintFor(enteredAt!), s.id === currentStateId ? LIT_STRENGTH_CURRENT : LIT_STRENGTH)
-          return <path key={s.id} d={s.d} fill={fill} />
+          // data-state and data-lit are inert, and exist so the map can be
+          // tested at all. An SVG of the country offers nothing else to hold
+          // on to, and this is the component that sits on the TV for a month.
+          return <path key={s.id} d={s.d} fill={fill} data-state={s.id} data-lit={lit} />
         })}
 
         <path d={BORDER_PATH} fill="none" stroke={BORDER} strokeWidth={0.7} />
@@ -297,7 +300,7 @@ export default function MapView({ totalMeters, paceMeters }: Props) {
           })}
 
         {/* Where the pace ghost would be */}
-        {ghostPt && <circle cx={ghostPt[0]} cy={ghostPt[1]} r={3.2} fill="rgba(255,255,255,0.85)" />}
+        {ghostPt && <circle data-ghost cx={ghostPt[0]} cy={ghostPt[1]} r={3.2} fill="rgba(255,255,255,0.85)" />}
 
         {/* Us */}
         {curPt && totalMeters > 0 && (
