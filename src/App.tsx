@@ -1,26 +1,29 @@
 import { useEffect, useRef, useState } from 'react'
-import { useQuery } from 'convex/react'
+import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
-import GlobeView from './GlobeView'
+import MapView from './MapView'
 import Celebration from './Celebration'
-import { EntryForm, RecentEntries, DemoTools, BoostToggle } from './EntryPanel'
+import { EntryForm, RecentEntries, DemoTools } from './EntryPanel'
 import { downloadShareCard } from './shareCard'
+import { clearTrainerKey, getTrainerKey, setTrainerKey } from './keys'
 import {
+  ACTS,
+  actAt,
+  crossedMilestones,
   GOAL,
-  KIOSK_PIN,
   MACHINES,
   MACHINE_COLORS,
   MILESTONES,
   Milestone,
   BRAND,
   MARATHON,
-  EVEREST,
   fmt,
   fmtKm,
   challengeDay,
   paceTarget,
-  CHALLENGE_DAYS,
-  CHALLENGE_START,
+  daysToStart,
+  CHALLENGE_NAME,
+  CHALLENGE_WINDOW,
 } from './config'
 import { locationLabel } from './geo'
 
@@ -67,16 +70,16 @@ function useAnimatedNumber(target: number, ms = 1400) {
 
 const BAR_LABELS: { m: number; label: string }[] = [
   { m: 0, label: 'Tulsa' },
-  { m: 2_350_000, label: 'NYC' },
-  { m: 7_600_000, label: 'Dublin' },
-  { m: 11_200_000, label: 'Istanbul' },
-  { m: 14_200_000, label: 'Dubai' },
-  { m: 19_100_000, label: 'Bangkok' },
-  { m: 26_100_000, label: 'Tokyo' },
-  { m: 32_300_000, label: 'Honolulu' },
-  { m: 36_400_000, label: 'LA' },
-  { m: 40_000_000, label: 'Tulsa' },
+  { m: 549_000, label: 'Amarillo' },
+  { m: 2_269_000, label: 'LA' },
+  { m: 3_816_000, label: 'Denver' },
+  { m: 5_294_000, label: 'Chicago' },
+  { m: 6_438_000, label: 'NYC' },
+  { m: 7_883_000, label: 'St. Louis' },
+  { m: 8_473_348, label: 'Tulsa' },
 ]
+
+const ACT_NUMERALS = ['I', 'II', 'III']
 
 function localDayKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -152,14 +155,21 @@ function RecapOverlay({
   )
 }
 
-export default function App() {
+// `castMode` is the /tv route: the display layout, locked. No trainer login,
+// no entry form, no way out — so a tab being cast to the gym TV cannot end up
+// showing an entry form and a Reset button to the whole room, and comes back
+// correctly on its own if the tab reloads. It does not ask for fullscreen,
+// because casting a tab sends the page content without browser chrome anyway,
+// and a page cannot enter fullscreen without a click to authorise it.
+export default function App({ castMode = false }: { castMode?: boolean }) {
   const summary = useQuery(api.worldTour.getSummary)
-  const settings = useQuery(api.worldTour.getSettings)
+  const verifyTrainer = useMutation(api.worldTour.verifyTrainer)
   const daily = useQuery(api.worldTour.getDaily)
-  const [tvMode, setTvMode] = useState(false)
-  const [kiosk, setKiosk] = useState(() => localStorage.getItem('tt-kiosk') === '1')
+  const [tvMode, setTvMode] = useState(castMode)
+  const [kiosk, setKiosk] = useState(
+    () => !castMode && localStorage.getItem('tt-kiosk') === '1' && getTrainerKey() !== ''
+  )
   const [celebQueue, setCelebQueue] = useState<Milestone[]>([])
-  const [flyToSignal, setFlyToSignal] = useState(0)
   const [showRecap, setShowRecap] = useState(false)
   const [replayValue, setReplayValue] = useState<number | null>(null)
   const prevTotal = useRef<number | null>(null)
@@ -172,7 +182,6 @@ export default function App() {
   }, [])
 
   const total = summary?.totalJourney ?? 0
-  const boostActive = settings?.boostActive ?? false
   const replaying = replayValue !== null
   const shownTotal = replaying ? replayValue! : total
   const animatedTotal = useAnimatedNumber(total)
@@ -186,18 +195,8 @@ export default function App() {
     }
     const prev = prevTotal.current
     if (total > prev) {
-      let crossed = MILESTONES.filter((ms) => ms.m > prev && ms.m <= total)
-      // A big catch-up entry can cross many milestones at once — celebrate only
-      // the majors plus the most recent one, so the TV isn't stuck in overlays.
-      if (crossed.length > 2) {
-        const majors = crossed.filter((c) => c.major || c.kind === 'finish' || c.kind === 'stretch')
-        const last = crossed[crossed.length - 1]
-        crossed = majors.includes(last) ? majors : [...majors, last]
-      }
-      if (crossed.length > 0) {
-        setCelebQueue((q) => [...q, ...crossed])
-        setFlyToSignal((s) => s + 1)
-      }
+      const crossed = crossedMilestones(prev, total)
+      if (crossed.length > 0) setCelebQueue((q) => [...q, ...crossed])
     }
     prevTotal.current = total
   }, [total, summary])
@@ -209,6 +208,15 @@ export default function App() {
   const cumBeforeYesterday = (daily ?? [])
     .filter((d) => d.key < yesterdayKey)
     .reduce((s, d) => s + d.journey, 0)
+
+  // Today measured against the gym's own best day. With no deadline this is
+  // the only urgency left, and it is collective — nobody is ranked against
+  // anybody, the room is racing its own history.
+  const todayMeters = daily?.find((d) => d.key === todayKey)?.journey ?? 0
+  const bestPreviousDay = (daily ?? [])
+    .filter((d) => d.key !== todayKey)
+    .reduce((best, d) => Math.max(best, d.journey), 0)
+  const beatingBest = todayMeters > 0 && bestPreviousDay > 0 && todayMeters > bestPreviousDay
   useEffect(() => {
     if (!yesterdayRow || replaying) return
     const hour = now.getHours()
@@ -221,6 +229,7 @@ export default function App() {
   // Fullscreen sync for TV mode
   useEffect(() => {
     const onFs = () => {
+      if (castMode) return
       if (!document.fullscreenElement) setTvMode(false)
     }
     document.addEventListener('fullscreenchange', onFs)
@@ -232,20 +241,28 @@ export default function App() {
     document.documentElement.requestFullscreen?.().catch(() => {})
   }
   function exitTvMode() {
+    if (castMode) return // /tv has nothing to exit to
     setTvMode(false)
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
   }
 
-  function trainerLogin() {
-    const pin = window.prompt('Trainer PIN:')
-    if (pin === KIOSK_PIN) {
+  // The key is checked by the server, not compared against a bundled constant,
+  // so a wrong key cannot be discovered by reading the site's source.
+  async function trainerLogin() {
+    const entered = window.prompt('Trainer PIN:')
+    if (entered === null) return
+    const key = entered.trim()
+    try {
+      await verifyTrainer({ key })
+      setTrainerKey(key)
       localStorage.setItem('tt-kiosk', '1')
       setKiosk(true)
-    } else if (pin !== null) {
-      window.alert('Wrong PIN')
+    } catch {
+      window.alert('That PIN was not accepted.')
     }
   }
   function trainerLock() {
+    clearTrainerKey()
     localStorage.removeItem('tt-kiosk')
     setKiosk(false)
   }
@@ -278,17 +295,21 @@ export default function App() {
   }, [])
 
   const day = challengeDay(now)
-  const daysToStart = Math.max(0, Math.ceil((CHALLENGE_START.getTime() - now.getTime()) / 86_400_000))
+  const toStart = daysToStart(now)
   const pace = paceTarget(now)
-  const paceDiff = total - pace
+  const paceDiff = pace === null ? null : total - pace
   const pct = Math.min(100, (shownTotal / GOAL) * 100)
   const loc = locationLabel(shownTotal)
   const celeb = celebQueue[0] ?? null
 
-  // Projected arrival: rate from challenge start (or first entry, pre-September).
+  // Projected arrival: rate from the challenge start, or from the first entry
+  // when there is no date window.
   let projected: Date | null = null
   if (total > 0 && total < GOAL && summary?.firstEntryAt) {
-    const rateBasis = day > 0 ? CHALLENGE_START.getTime() : summary.firstEntryAt
+    // With a date window, rate is measured from the official start. Without
+    // one, from the first entry ever logged.
+    const rateBasis =
+      CHALLENGE_WINDOW && day > 0 ? CHALLENGE_WINDOW.start.getTime() : summary.firstEntryAt
     const elapsed = now.getTime() - rateBasis
     if (elapsed > 60_000) {
       const rate = total / elapsed // meters per ms
@@ -296,6 +317,7 @@ export default function App() {
     }
   }
 
+  const { act, index: actIndex, pct: actPct } = actAt(shownTotal)
   const unlocked = MILESTONES.filter((ms) => ms.m <= total)
   const nextMilestone = MILESTONES.find((ms) => ms.m > total)
   const feed = unlocked.slice(-6).reverse()
@@ -346,7 +368,7 @@ export default function App() {
                 <div className="text-xs font-bold tracking-[0.3em] uppercase" style={{ color: BRAND.red }}>
                   Tulsa Training
                 </div>
-                <div className="font-display text-2xl uppercase tracking-wide leading-none">World Tour</div>
+                <div className="font-display text-2xl uppercase tracking-wide leading-none">{CHALLENGE_NAME}</div>
               </div>
               <button
                 onClick={enterTvMode}
@@ -357,7 +379,6 @@ export default function App() {
               </button>
               {kiosk ? (
                 <>
-                  <BoostToggle />
                   <button
                     onClick={trainerLock}
                     className="px-3 py-2 rounded-lg font-bold text-xs uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors"
@@ -381,34 +402,24 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Globe hero ── */}
+      {/* ── Map hero ── */}
       <div
         className="relative w-full"
         style={{ height: tvMode ? '72vh' : '58vh', background: '#050505' }}
-        onDoubleClick={tvMode ? exitTvMode : undefined}
+        onDoubleClick={tvMode && !castMode ? exitTvMode : undefined}
       >
-        <GlobeView totalMeters={shownTotal} paceMeters={replaying ? 0 : pace} flyToSignal={flyToSignal} follow={replaying} />
+        <MapView totalMeters={shownTotal} paceMeters={replaying ? 0 : pace ?? 0} />
 
-        {/* Boost banner */}
-        {boostActive && !replaying && (
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none">
-            <div
-              className="pulse-dot px-6 py-2 rounded-b-xl font-display uppercase tracking-wide text-lg"
-              style={{ background: BRAND.red, color: '#fff', boxShadow: `0 0 30px ${BRAND.red}88` }}
-            >
-              Boost day — every meter counts twice
-            </div>
-          </div>
-        )}
-
-        {/* Countdown — only inside the final week before September 1 */}
-        {day === 0 && daysToStart <= 7 && !replaying && (
+        {/* Countdown — only inside the final week before the start date.
+            No date window set means no countdown at all. */}
+        {toStart !== null && toStart <= 7 && !replaying && (
           <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center pointer-events-none">
             <div className="text-sm font-bold tracking-[0.5em] uppercase mb-2" style={{ color: BRAND.pink }}>
-              Around the world begins September 1
+              {CHALLENGE_NAME} begins{' '}
+              {CHALLENGE_WINDOW?.start.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
             </div>
             <div className="font-display uppercase leading-none" style={{ fontSize: 'clamp(3rem, 8vw, 6.5rem)', textShadow: '0 2px 30px rgba(0,0,0,0.9)' }}>
-              T-minus {daysToStart} {daysToStart === 1 ? 'day' : 'days'}
+              T-minus {toStart} {toStart === 1 ? 'day' : 'days'}
             </div>
           </div>
         )}
@@ -425,7 +436,7 @@ export default function App() {
         {/* Top-left: the big number */}
         <div className="absolute top-4 left-5 pointer-events-none">
           <div className="text-xs font-bold tracking-[0.35em] uppercase mb-1" style={{ color: BRAND.pink }}>
-            {tvMode ? 'Tulsa Training — World Tour' : 'Around the world'}
+            {tvMode ? `Tulsa Training — ${CHALLENGE_NAME}` : CHALLENGE_NAME}
           </div>
           <div className="font-display leading-none tabular-nums" style={{ fontSize: tvMode ? '5.5rem' : '3.8rem', textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}>
             {fmt(replaying ? shownTotal : animatedTotal)}
@@ -441,10 +452,41 @@ export default function App() {
         {/* Top-right: day + pace + projection */}
         {!replaying && (
           <div className="absolute top-4 right-5 text-right pointer-events-none">
-            <div className="font-display text-3xl uppercase leading-none" style={{ textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}>
-              {day === 0 ? 'Pre-season' : day <= CHALLENGE_DAYS ? `Day ${day} of ${CHALLENGE_DAYS}` : 'Overtime'}
-            </div>
-            {day > 0 && (
+            {CHALLENGE_WINDOW && (
+              <div className="font-display text-3xl uppercase leading-none" style={{ textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}>
+                {day === 0
+                  ? 'Pre-season'
+                  : day <= CHALLENGE_WINDOW.days
+                    ? `Day ${day} of ${CHALLENGE_WINDOW.days}`
+                    : 'Overtime'}
+              </div>
+            )}
+            {todayMeters > 0 && (
+              <div className={CHALLENGE_WINDOW ? 'mt-2' : ''}>
+                <div className="text-xs uppercase tracking-widest" style={{ color: BRAND.pink }}>
+                  Today
+                </div>
+                <div
+                  className="font-display uppercase leading-none tabular-nums"
+                  style={{ fontSize: tvMode ? '3rem' : '2.2rem', textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}
+                >
+                  {fmt(todayMeters)}
+                </div>
+                {bestPreviousDay > 0 && (
+                  <div
+                    className="mt-1 inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider"
+                    style={
+                      beatingBest
+                        ? { background: 'rgba(16,185,129,0.15)', color: '#10B981', border: '1px solid #10B98144' }
+                        : { background: '#141414cc', color: '#a1a1aa', border: '1px solid #2a2a2a' }
+                    }
+                  >
+                    {beatingBest ? 'Best day yet' : `${fmtKm(bestPreviousDay - todayMeters)} off our best`}
+                  </div>
+                )}
+              </div>
+            )}
+            {paceDiff !== null && day > 0 && (
               <div
                 className="mt-2 inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider"
                 style={{
@@ -466,33 +508,44 @@ export default function App() {
             )}
             {total >= GOAL && (
               <div className="mt-2 text-sm font-black uppercase tracking-widest" style={{ color: BRAND.pink }}>
-                Around the world — complete
+                {CHALLENGE_NAME} — complete
               </div>
             )}
           </div>
         )}
 
-        {/* Bottom-left: where are we */}
+        {/* Bottom-left: where we are, and — much bigger — what we are chasing.
+            "4,000 meters to Santa Fe" is the one number a trainer can turn into
+            an ask on the gym floor, so it gets the weight. */}
         <div className="absolute bottom-4 left-5 pointer-events-none">
           <div className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Current position</div>
-          <div className="text-lg font-bold" style={{ textShadow: '0 1px 10px rgba(0,0,0,0.9)' }}>
+          <div className="text-base font-bold" style={{ textShadow: '0 1px 10px rgba(0,0,0,0.9)' }}>
             <span className="pulse-dot inline-block w-2.5 h-2.5 rounded-full mr-2" style={{ background: BRAND.red }} />
             {loc.where}
-            {loc.toNext > 0 && (
-              <span className="text-zinc-400 font-normal">
-                {' '}
-                — next stop <span className="text-white font-bold">{loc.nextStop}</span> · {fmtKm(loc.toNext)}
-              </span>
-            )}
           </div>
+          {loc.toNext > 0 && (
+            <div className="mt-3">
+              <div className="text-xs uppercase tracking-widest mb-0.5" style={{ color: BRAND.pink }}>
+                Next stop
+              </div>
+              <div
+                className="font-display uppercase leading-none"
+                style={{ fontSize: tvMode ? '3.2rem' : '2.2rem', textShadow: '0 2px 20px rgba(0,0,0,0.9)' }}
+              >
+                {loc.nextStop}
+              </div>
+              <div className="text-sm font-bold text-zinc-300 mt-1" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>
+                <span className="tabular-nums text-white">{fmtKm(loc.toNext)}</span> to go
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Bottom-right: counters + actions */}
         <div className="absolute bottom-4 right-5 text-right">
           <div className="text-xs text-zinc-500 uppercase tracking-widest mb-1 pointer-events-none">So far that's</div>
           <div className="text-sm text-zinc-300 pointer-events-none" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>
-            <span className="font-black text-white tabular-nums">{fmt(Math.floor(shownTotal / MARATHON))}</span> marathons ·{' '}
-            <span className="font-black text-white tabular-nums">{fmt(Math.floor(shownTotal / EVEREST))}</span> Everests
+            <span className="font-black text-white tabular-nums">{fmt(Math.floor(shownTotal / MARATHON))}</span> marathons
           </div>
           <div className="mt-2 flex gap-2 justify-end">
             {yesterdayRow && !replaying && (
@@ -520,7 +573,7 @@ export default function App() {
           </div>
         </div>
 
-        {tvMode && (
+        {tvMode && !castMode && (
           <button
             onClick={exitTvMode}
             className="absolute top-4 right-1/2 translate-x-1/2 text-zinc-700 text-xs uppercase tracking-widest hover:text-zinc-400"
@@ -530,48 +583,90 @@ export default function App() {
         )}
       </div>
 
-      {/* ── Journey bar ── */}
+      {/* ── Act strip ── the loop is three journeys, and each one ends
+           somewhere that feels like an arrival. ── */}
+      <div className="max-w-screen-2xl mx-auto px-5 pt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-xs font-black uppercase tracking-[0.3em]" style={{ color: BRAND.pink }}>
+          Act {ACT_NUMERALS[actIndex] ?? ''}
+        </span>
+        <span className="font-display text-xl uppercase leading-none">{act.name}</span>
+        <span className="text-xs text-zinc-500">{act.blurb}</span>
+        <span className="ml-auto text-xs text-zinc-400 tabular-nums">
+          {actPct.toFixed(0)}% of act {actIndex + 1} of {ACTS.length}
+        </span>
+      </div>
+
+      {/* ── Journey bar, split into the three acts ──
+           One 8,473 km bar gives the room a single win, 31 days away. Three
+           bars give it three, and the first arrives inside a week. The widths
+           stay proportional to the real distances, so it still reads as one
+           journey — and Act II visibly being half the challenge is the honest
+           thing to show, not something to smooth over. */}
       <div className="max-w-screen-2xl mx-auto px-5 pt-2 pb-1">
-        <div className="relative h-4 rounded-full overflow-visible" style={{ background: '#161616' }}>
-          <div
-            className="absolute left-0 top-0 h-full rounded-full transition-all duration-1000"
-            style={{
-              width: `${pct}%`,
-              background: `linear-gradient(90deg, ${BRAND.darkRed}, ${BRAND.red}, ${BRAND.pink})`,
-              boxShadow: `0 0 14px ${BRAND.red}66`,
-            }}
-          />
-          {/* pace ghost tick */}
-          {day > 0 && !replaying && (
-            <div
-              className="absolute top-[-4px] w-[2px] h-6 bg-white/70"
-              style={{ left: `${Math.min(100, (pace / GOAL) * 100)}%` }}
-              title="On-pace position"
-            />
-          )}
-          {/* city ticks */}
-          {BAR_LABELS.map((c, i) => (
-            <div
-              key={i}
-              className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full"
-              style={{
-                left: `calc(${(c.m / GOAL) * 100}% - 4px)`,
-                background: c.m <= shownTotal ? '#fff' : '#3a3a3a',
-                border: `2px solid ${c.m <= shownTotal ? BRAND.red : '#242424'}`,
-              }}
-            />
-          ))}
-        </div>
-        <div className="relative h-5 mt-1 text-[10px] uppercase tracking-wider text-zinc-500">
-          {BAR_LABELS.map((c, i) => (
-            <span
-              key={i}
-              className="absolute -translate-x-1/2"
-              style={{ left: `${(c.m / GOAL) * 100}%`, color: c.m <= shownTotal ? BRAND.pink : undefined }}
-            >
-              {c.label}
-            </span>
-          ))}
+        <div className="flex gap-1.5 items-end">
+          {ACTS.map((a, i) => {
+            const span = a.to - a.from
+            const filled = Math.max(0, Math.min(span, shownTotal - a.from))
+            const actDone = shownTotal >= a.to
+            const isHere = !actDone && shownTotal >= a.from
+            const cities = BAR_LABELS.filter((c) => c.m > a.from && c.m <= a.to)
+            return (
+              // minWidth 0 or the act names set a floor on each bar, which
+              // breaks the proportions on a narrow screen and stops `truncate`
+              // from ever truncating.
+              <div key={a.name} style={{ flexGrow: span, flexBasis: 0, minWidth: 0 }}>
+                <div
+                  className="relative h-4 rounded-full overflow-visible transition-all duration-500"
+                  style={{
+                    background: '#161616',
+                    border: isHere ? `1px solid ${BRAND.darkRed}` : '1px solid transparent',
+                  }}
+                >
+                  <div
+                    className="absolute left-0 top-0 h-full rounded-full transition-all duration-1000"
+                    style={{
+                      width: `${(filled / span) * 100}%`,
+                      background: `linear-gradient(90deg, ${BRAND.darkRed}, ${BRAND.red}, ${BRAND.pink})`,
+                      boxShadow: filled > 0 ? `0 0 14px ${BRAND.red}66` : undefined,
+                    }}
+                  />
+                  {/* pace ghost, drawn only in the act it currently falls in */}
+                  {pace !== null && day > 0 && !replaying && pace > a.from && pace <= a.to && (
+                    <div
+                      className="absolute top-[-4px] w-[2px] h-6 bg-white/70"
+                      style={{ left: `${((pace - a.from) / span) * 100}%` }}
+                      title="On-pace position"
+                    />
+                  )}
+                  {cities.map((c, j) => (
+                    <div
+                      key={j}
+                      className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full"
+                      style={{
+                        left: `calc(${((c.m - a.from) / span) * 100}% - 4px)`,
+                        background: c.m <= shownTotal ? '#fff' : '#3a3a3a',
+                        border: `2px solid ${c.m <= shownTotal ? BRAND.red : '#242424'}`,
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="mt-1.5 flex items-baseline gap-1.5 overflow-hidden">
+                  <span
+                    className="text-[10px] font-black tracking-[0.2em] shrink-0"
+                    style={{ color: actDone ? BRAND.red : isHere ? BRAND.pink : '#3f3f46' }}
+                  >
+                    {actDone ? '✓' : ACT_NUMERALS[i]}
+                  </span>
+                  <span
+                    className="text-[10px] uppercase tracking-wider truncate"
+                    style={{ color: actDone || isHere ? '#a1a1aa' : '#3f3f46' }}
+                  >
+                    {a.name}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
 

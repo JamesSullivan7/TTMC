@@ -1,4 +1,4 @@
-import { ROUTE } from './config'
+import { ROUTE, CHALLENGE_NAME } from './config'
 
 // Interpolate position along the route for a given journey-meter total.
 // Handles date-line crossing by always taking the shortest longitude path.
@@ -26,7 +26,7 @@ export function locationLabel(meters: number): { where: string; nextStop: string
   const total = Math.max(0, meters)
   const last = ROUTE[ROUTE.length - 1]
   if (total >= last.m) {
-    return { where: 'Home in Tulsa', nextStop: 'Around the world — complete', toNext: 0 }
+    return { where: 'Home in Tulsa', nextStop: `${CHALLENGE_NAME} — complete`, toNext: 0 }
   }
   let i = 0
   while (i < ROUTE.length - 1 && ROUTE[i + 1].m <= total) i++

@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
-import { Milestone, BRAND, fmt } from './config'
+import { useEffect, useRef, useState } from 'react'
+import { Milestone, BRAND, fmt, CHALLENGE_NAME } from './config'
 import { downloadShareCard } from './shareCard'
 
 const CONFETTI_COLORS = ['#D93B58', '#F29BAB', '#8C2336', '#ffffff']
@@ -39,6 +39,19 @@ export default function Celebration({
   const onDoneRef = useRef(onDone)
   onDoneRef.current = onDone
 
+  // Half the postcards for this route are not shot yet. Rather than render a
+  // washed-out overlay over a 404, confirm the photo actually loads and fall
+  // back to the brand treatment when it does not — so dropping a JPG into
+  // public/postcards/ is the only step needed to light one up.
+  const [photoOk, setPhotoOk] = useState(false)
+  useEffect(() => {
+    setPhotoOk(false)
+    if (!milestone.img) return
+    const img = new Image()
+    img.onload = () => setPhotoOk(true)
+    img.src = milestone.img
+  }, [milestone.img])
+
   useEffect(() => {
     if (isFinish) return // finish stays until clicked
     const t = setTimeout(onDone, big ? 14_000 : 8_000)
@@ -58,7 +71,7 @@ export default function Celebration({
   return (
     <div ref={rootRef} className="fixed inset-0 z-50 cursor-pointer celeb-fade">
       {/* Postcard backdrop (if a photo exists for this milestone) */}
-      {milestone.img && (
+      {photoOk && milestone.img && (
         <div
           className="absolute inset-0"
           style={{
@@ -72,7 +85,7 @@ export default function Celebration({
       <div
         className="absolute inset-0"
         style={{
-          background: milestone.img
+          background: photoOk
             ? 'radial-gradient(ellipse at center, rgba(20,5,8,0.72) 0%, rgba(5,5,5,0.94) 80%)'
             : 'radial-gradient(ellipse at center, rgba(140,35,54,0.94) 0%, rgba(5,5,5,0.98) 75%)',
         }}
@@ -122,7 +135,7 @@ export default function Celebration({
           </button>
 
           <div className="mt-6 text-xs uppercase tracking-widest text-zinc-400">
-            {isFinish ? 'Click anywhere to continue' : 'Tulsa Training — World Tour'}
+            {isFinish ? 'Click anywhere to continue' : `Tulsa Training — ${CHALLENGE_NAME}`}
           </div>
         </div>
       </div>
