@@ -121,7 +121,7 @@ export const MILESTONES: Milestone[] = [
   { m: 5_294_000, name: 'Chicago', img: '/postcards/chicago.jpg', kind: 'city', lat: 41.88, lng: -87.63, major: true, note: 'The other end of Route 66. We left town on this road — here is where it starts.' },
   { m: 5_600_000, name: 'The shore of Lake Erie', kind: 'mark' },
   { m: 5_789_000, name: 'Cleveland', img: '/postcards/cleveland.jpg', kind: 'city', lat: 41.5, lng: -81.69 },
-  { m: 6_000_000, name: '6 million meters', kind: 'mark' },
+  { m: 6_000_000, name: '6 million meters', img: '/postcards/6-million.jpg', kind: 'mark' },
   { m: 6_438_000, name: 'NEW YORK CITY', img: '/postcards/nyc.jpg', kind: 'city', lat: 40.71, lng: -74.01, major: true, note: 'The Atlantic. Both oceans, done. Everything from here is the way home.' },
 
   // ── ACT III — THE RUN HOME · New York to Tulsa ────────────────────────────
@@ -131,10 +131,10 @@ export const MILESTONES: Milestone[] = [
   { m: 7_242_000, name: 'Columbus', kind: 'city', lat: 39.96, lng: -83.0 },
   { m: 7_512_000, name: 'Indianapolis', kind: 'city', lat: 39.77, lng: -86.16 },
   { m: 7_883_000, name: 'St. Louis', img: '/postcards/stlouis.jpg', kind: 'city', lat: 38.63, lng: -90.2, major: true, note: 'The Gateway Arch, and the Mississippi crossed again — westbound, homeward' },
-  { m: 8_000_000, name: '8 million meters', kind: 'mark' },
+  { m: 8_000_000, name: '8 million meters', img: '/postcards/8-million.jpg', kind: 'mark' },
   { m: 8_196_000, name: 'Springfield, MO', img: '/postcards/springfield.jpg', kind: 'city', lat: 37.21, lng: -93.29 },
   { m: 8_306_000, name: 'Joplin, MO', img: '/postcards/joplin.jpg', kind: 'city', lat: 37.08, lng: -94.51, note: 'Back on Route 66. Last stop before home.' },
-  { m: 8_373_348, name: '100 KM TO GO', kind: 'mark', major: true, note: 'Everyone in this room has driven the rest of it' },
+  { m: 8_373_348, name: '100 KM TO GO', img: '/postcards/100-to-go.jpg', kind: 'mark', major: true, note: 'Everyone in this room has driven the rest of it' },
   { m: 8_473_348, name: 'TULSA. HOME.', kind: 'finish', lat: 36.15, lng: -95.99, major: true, note: 'Coast to coast to coast. 8,473 kilometers. 200 marathons. WE DID IT.' },
 ]
 

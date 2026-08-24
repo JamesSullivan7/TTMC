@@ -290,16 +290,23 @@ for row in "${PENDING[@]}"; do
       say "A photo of this place, for the celebration backdrop."
       say ""
       step "Pick something wide, and moody enough to read white text over."
+      note "It is a backdrop, not a card: the milestone name and meter count"
+      note "are drawn on top of it. Avoid anything with big text of its own."
+
       note "Unsplash is free to use commercially — these end up on Instagram"
       note "share cards, so avoid anything you would have to license."
       open_url "https://unsplash.com/s/photos/${QUERY// /-}"
       ;;
     make)
-      say "This one is a number card, not a photo."
+      say "A backdrop with no place to photograph — a mood, not a landmark."
       say ""
-      step "Match the existing ones — open halfway.jpg to see the style."
-      step "Big number, brand red #D93B58 on near-black, Anton-ish type."
-      note "public/postcards/halfway.jpg is the reference"
+      step "Run: node scripts/backdrops.mjs, and open the URL it prints."
+      step "It draws these and writes them for you."
+      note "DO NOT print the number into the image. Celebration already draws"
+      note "the milestone name and its meter count on top, over a wash that"
+      note "takes the photo down to 28%. A number in the image is a second"
+      note "number arguing with the real one — halfway.jpg used to read"
+      note "\"20 MILLION\" behind a foreground saying 4,236,674."
       ;;
     shoot)
       say "This is the finish frame. It has to be your own photo."
