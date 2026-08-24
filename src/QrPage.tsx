@@ -42,6 +42,12 @@ export default function QrPage() {
           `${window.location.origin}/join?t=${encodeURIComponent(token)}`,
           opts
         )
+        // The same trick for the personal totals card: scanning it to look up
+        // your meters also leaves the phone able to log more.
+        out.__me = await QR.toDataURL(
+          `${window.location.origin}/me?t=${encodeURIComponent(token)}`,
+          opts
+        )
         if (!cancelled) setCodes(out)
       } catch {
         if (!cancelled) setFailed(true)
@@ -120,6 +126,30 @@ export default function QrPage() {
               This September the whole gym drives one road together — Tulsa to Los Angeles to
               New York and home. Put in your name and say how many meters you will cover.
               Whatever is honest for you.
+            </p>
+          </div>
+        )}
+
+        {/* Your own meters. This one goes up during the challenge rather than
+            before it — on the wall by the machines, where somebody has just
+            finished and is standing there wondering whether it added up to
+            anything. It shows you your own numbers and nobody else's. */}
+        {codes.__me && (
+          <div
+            className="card rounded-2xl p-6 text-center sm:col-span-2"
+            style={{ border: `3px solid ${BRAND.pink}` }}
+          >
+            <div className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: BRAND.red }}>
+              Tulsa Training · {CHALLENGE_NAME}
+            </div>
+            <div className="font-display text-4xl uppercase mt-1 leading-none">Your meters</div>
+            <img src={codes.__me} alt="QR code to see your own meters" className="w-56 h-56 mx-auto my-4" />
+            <div className="font-black text-lg uppercase tracking-wide">
+              Scan to see what you have done
+            </div>
+            <p className="text-sm text-zinc-600 mt-2 leading-relaxed max-w-md mx-auto">
+              Type your name and see every meter you have put in, which machines you did it on,
+              and how you are tracking against the number you claimed.
             </p>
           </div>
         )}

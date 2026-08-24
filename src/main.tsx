@@ -7,6 +7,7 @@ import QrPage from './QrPage'
 import JoinPage from './JoinPage'
 import PledgePage from './PledgePage'
 import PledgesPage from './PledgesPage'
+import MePage from './MePage'
 import { CHALLENGE_WINDOW } from './config'
 import './index.css'
 
@@ -19,6 +20,7 @@ const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string)
 //   /pledges who has pledged what — browsable, searchable
 //   /join   a member's phone: claim your meters
 //   /log    a member's phone: log what you did
+//   /me     a member's phone: what you have done, and on which machines
 //   /qr     a trainer printing the machine codes, once
 //
 // Vercel serves index.html for unknown paths (see vercel.json), so these are
@@ -52,6 +54,7 @@ function Route() {
   if (path === '/join') return <JoinPage />
   if (path === '/pledge') return <PledgePage />
   if (path === '/pledges') return <PledgesPage />
+  if (path === '/me') return <MePage />
   if (path === '/tv') return <GymTv />
   return <App />
 }

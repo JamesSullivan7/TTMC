@@ -251,6 +251,65 @@ export const peopleWithTotals = query({
   },
 })
 
+// One person's own meters, for their own phone.
+//
+// Deliberately NOT peopleWithTotals filtered down. That query collects the
+// whole entries table, and during the challenge every phone in the gym would
+// hold a live subscription to it — so one person logging would re-run and
+// re-send all 182 people's totals to all of them. This reads only the rows
+// the by_person index hands back, which is the same reason personId is
+// indexed in the first place.
+//
+// No key. A member scans a code and types their name; the same totals are
+// already public on /pledges, and a token in the way is friction against the
+// one thing this page exists to do.
+export const personStats = query({
+  // A plain string, not v.id('people'), on purpose. The id comes off a phone's
+  // localStorage and can outlive what it points at — a person removed, a
+  // challenge reset, or the same phone having once opened the dev deployment.
+  // A v.id() validator rejects those before the handler runs, and useQuery
+  // rethrows that during render: a blank page on a member's phone with no way
+  // out. normalizeId turns every one of those into null, which is a state this
+  // page already knows how to recover from.
+  args: { id: v.string() },
+  handler: async (ctx, { id }) => {
+    const personId = ctx.db.normalizeId('people', id)
+    if (!personId) return null
+    const person = await ctx.db.get(personId)
+    if (!person) return null
+
+    const entries = await ctx.db
+      .query('entries')
+      .withIndex('by_person', (q) => q.eq('personId', personId))
+      .collect()
+
+    const byMachine: Record<string, { meters: number; count: number }> = {}
+    let meters = 0
+    let lastAt = 0
+    for (const e of entries) {
+      meters += e.meters
+      const row = (byMachine[e.machine] ??= { meters: 0, count: 0 })
+      row.meters += e.meters
+      row.count += 1
+      if (e._creationTime > lastAt) lastAt = e._creationTime
+    }
+
+    return {
+      id: person._id,
+      name: person.name,
+      firstName: person.firstName,
+      lastName: person.lastName,
+      pledgeMeters: person.pledgeMeters,
+      meters,
+      entries: entries.length,
+      byMachine,
+      lastAt,
+      pledgePct: person.pledgeMeters > 0 ? Math.min(100, (meters / person.pledgeMeters) * 100) : 0,
+      keptPledge: person.pledgeMeters > 0 && meters >= person.pledgeMeters,
+    }
+  },
+})
+
 // Trainers can remove a bad entry — the safety valve that lets pledging stay
 // open in the first place.
 export const removePerson = mutation({
