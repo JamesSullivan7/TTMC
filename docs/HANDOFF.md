@@ -1,8 +1,32 @@
 # Handoff
 
-State as of commit `8fce05c`, on branch `pivot/cross-country`.
-PR: https://github.com/JamesSullivan7/TTMC/pull/1 — 27 commits, **not merged**.
-Live: https://tt-cross-country.vercel.app
+State as of commit `338537c` on `main`. PR #1 is **merged** — 37 commits — and
+the whole cross-country pivot is live at https://tt-cross-country.vercel.app.
+
+`main` is now the record of what is deployed. It was not before: production ran
+branch code for several days while `main` had no `PledgePage.tsx` at all, so
+anyone deploying `main` would have taken the board off the TV.
+
+## Deploying is two commands, not one
+
+This is the one that will bite you.
+
+```
+npx convex deploy      # the backend — functions and schema
+git push / merge       # the frontend — Vercel builds it
+```
+
+They are **separate**, and nothing enforces the order. Ship a frontend that
+calls a function you have not deployed and it fails on a member's phone, not at
+deploy time — which is exactly what nearly happened with `people:personStats`.
+
+**Backend first, always.** Section G of the acceptance suite calls every
+`api.x.y` the app references and fails if any of them does not answer, which is
+the check that catches this. Note that it cannot be written the obvious way:
+over the HTTP API a missing function and a rejected-argument error are
+indistinguishable — both come back as an opaque `Server Error` with HTTP 200,
+and the "Could not find function" text appears only in the CLI. So it calls each
+one with arguments that must succeed and treats success as the proof.
 
 **Read [`../README.md`](../README.md) first.** It is current and covers the route, the three key tiers, the machine units, the surfaces, sizing and deploy — including a "notes for whoever works on this next" section. This document does not repeat it. It covers the decisions, constraints and traps that are not visible in the code or the commit log.
 
@@ -38,72 +62,112 @@ Dev deployment has its own separate values (same commands without `--prod`). A c
 
 ---
 
-## Next up
+## What the board looks like now
 
-### ~~Gauge bar colours~~ — done
+- **The gauge track** carries the map's dashed road ahead, drifting the way the
+  journey goes. It was `#161616` on `#050505` — **1.13:1**, which is not a dark
+  track on a gym TV, it is nothing. Colours are in a labelled `── The gauge ──`
+  block at the top of `src/PledgePage.tsx`, the way `src/MapView.tsx` does it;
+  `TRACK_EDGE` is the first dial to reach for.
+  - The dash colour, the 5:7 rhythm and the 0.8s cadence are **taken from the
+    map's road-ahead path** (`strokeDasharray="5 7"`, dashoffset 0→-24 over
+    1.6s). Change one, change both, or the two surfaces stop matching.
+  - The drift is a `transform` on a layer that bleeds one dash period past the
+    track and is clipped by `overflow-hidden`, so the loop has no seam at any
+    length and stays on the compositor. `prefers-reduced-motion` stops it, which
+    is fine — static dashes are still 2.73:1, so the fix does not depend on the
+    motion.
+- **Secondary text on the TV layout is white.** Zinc-400 is 8.0:1 on this
+  background and zinc-500 is 4.2:1, and the worst of it landed on the smallest
+  type. The phone keeps the greys: it is read at arm's length.
+- **Sized in `vw`, `h-screen`, `overflow-hidden`. Do not reintroduce fixed px** —
+  two separate rounds of layout bugs came from exactly that.
 
-The track was `#161616` on `#050505`: **1.13:1**, which is not a dark track on a gym
-TV, it is nothing. Five options were mocked at true board scale and James picked
-**road ahead**: the unfilled track now carries the map's dashed road, drifting the
-way the journey goes.
+### Badges — the last thing designed and not built
 
-- Colours live in a labelled `── The gauge ──` block at the top of `src/PledgePage.tsx`,
-  the way `src/MapView.tsx` does it. `TRACK_EDGE` is the first dial to reach for —
-  it is the hairline that makes the tube read as a shape at distance.
-- The dash colour, the 5:7 rhythm and the 0.8s cadence are **taken from the map's
-  road-ahead path** (`strokeDasharray="5 7"`, dashoffset 0→-24 over 1.6s). If that
-  changes, change both, or the two surfaces stop matching.
-- The drift is a `transform` on a layer that bleeds one dash period past the track,
-  clipped by `overflow-hidden` — so the loop has no seam at any track length, and it
-  stays on the compositor. Keyframes are in `src/index.css`; the slide distance reads
-  `--dash-period` off the element so it cannot drift apart from the gradient.
-- **`prefers-reduced-motion` stops the drift**, and that is fine: static dashes still
-  sit at 2.73:1 against the board, so the contrast fix does not depend on the motion.
-- The board is `h-screen` + `overflow-hidden` and sized in `vw`. **Do not reintroduce
-  fixed px** — two separate rounds of layout bugs came from exactly that. The dash
-  geometry is in `vw` for the TV and `rem` for the phone for the same reason.
+- **Hitting your own pledge.** Identical badge whether somebody pledged 20,000 or
+  500,000 — the only achievement genuinely available to every member, and the one
+  to make loudest. The data already exists as `keptPledge` on
+  `people:peopleWithTotals` and on `people:personStats`.
+- **Volume tiers on top.** An even share across 182 members is ~46,500, so pick
+  tiers against that, not against the pledge buttons — those are aspirational and
+  start at 150,000.
 
-Still open, and deliberately not decided here: at 4.1% the fill is a smear no track
-colour fixes (a "waterline" cap was mocked and not built), and the tube measures
-pledges against the full 8,473,348 — so in August it is a near-empty tube on the one
-board whose job is to make signing up look like it is happening. That is a framing
-question, not a colour one.
+**Open decision, not to be made unilaterally:** tier naming. Road-crew names
+(Navigator / Driver / Long Hauler / Road Captain) are more fun but read as a soft
+ranking; plain facts (100 km Club / Quarter Million) cannot. Asked twice, still
+unanswered — build it with plain-fact names and rename in one edit if that is
+still where it stands.
 
-### Badges
+### Also open, deliberately
 
-Designed in conversation, not built. Two kinds, deliberately:
-
-- **Hitting your own pledge.** Identical badge whether somebody pledged 20,000 or 300,000 — the only achievement genuinely available to every member, and the one to make loudest. The data already exists as `keptPledge` on `people:peopleWithTotals`.
-- **Volume tiers on top**, roughly 25k / 50k / 100k / 250k. The average share is ~46,500.
-
-**Open decision, not to be made unilaterally:** tier naming. Road-crew names (Navigator / Driver / Long Hauler / Road Captain) are more fun but read as a soft ranking; plain facts (100 km Club / Quarter Million) cannot. Asked, not yet answered.
+- At low percentages the gauge fill is a smear no track colour fixes. A
+  "waterline" cap was mocked and not built.
+- The tube measures pledges against the full 8,473,348, so before the challenge
+  it is a near-empty tube on the one board whose job is to make signing up look
+  like it is happening. A framing question, not a colour one.
+- `/me` is reachable **only** by scanning its printed card. Nothing in the app
+  links to it. A link from `/log` after a successful entry is the obvious fix.
 
 ---
 
 ## Blocked on James
 
-1. **The gym member list** (CSV) → `node scripts/import-roster.mjs <file> <ADMIN_KEY> --prod`. The importer is built and tested against deliberately messy input. Roster rows sit at 0 meters and stay off the TV until their owner pledges.
-2. **22 postcard photos**, including `tulsa.jpg` — his own photo of the gym and the crew, for the finish frame. `bash scripts/postcards.sh` walks them.
+1. **The gym member list** (CSV) → `node scripts/import-roster.mjs <file> <ADMIN_KEY> --prod`.
+   The importer is built and tested against deliberately messy input. Roster rows
+   sit at 0 meters and stay off the TV until their owner pledges.
+
+   **This is the one that matters.** Production has *three* people pledged against
+   a gym of roughly 182. Until the list is in, the name typeahead can suggest
+   nobody, `/me` cannot find a member who has not pledged, the names column is
+   three rows, and the pledge total means nothing.
+2. **19 postcard photos**, including `tulsa.jpg` — his own photo of the gym and the
+   crew, for the finish frame. `docs/postcards-needed.md` lists every one with a
+   search for it; `bash scripts/postcards.sh` walks them one at a time and wires
+   each into the config as it lands.
 3. **Badge tier naming**, above.
 
 ## Designed but unbuilt
 
 - **Landmark credits** — *"Cadillac Ranch, reached by Sarah"*. The attribution data is in place now.
 - **Wrapped card** at the finish, with the member's photo, printable. Photos make those pages trainer-only.
-- **Personal route position** — *"you have personally driven to Santa Fe"*. Explicitly deferred.
-- **Component tests.** The 32 existing tests cover pure logic; nothing covers the pages.
+- **Component tests beyond the two pages.** `PledgePage` and `MePage` have 25
+  between them. `App`, `MapView`, `LogPage`, `Celebration`, `JoinPage`, `QrPage`
+  and `PledgesPage` have none — and `MapView` is what is on the TV all month.
+
+*Personal route position was "explicitly deferred" and is now built:* `/me` tells
+you how far out of Tulsa your own meters would have taken you. Note it is phrased
+off the **next** stop rather than `locationLabel`'s `where`, which answers "how far
+has the gym got" and returns the last waypoint passed — for one person that is
+almost always still Tulsa, and it read *"driven out of Tulsa as far as Past Tulsa"*.
 
 ---
 
 ## Checks
 
 ```
-npm test                                                   # 32, pure logic only
+npm test                                                   # 57: route data, geometry, units, two pages
 npm run build
-npm run acceptance -- <ADMIN_KEY> <LOG_TOKEN> <TRAINER_PIN> # 44 checks, live deployment
+npm run acceptance -- <ADMIN_KEY> <LOG_TOKEN> <TRAINER_PIN> # 68 checks, live deployment
 ```
 
-The acceptance suite **writes real entries and then resets**, so it must not be pointed at production now that real pledges exist. Use dev.
+The acceptance suite **writes real entries and then resets**, so it must not be
+pointed at production now that real pledges exist. Use dev. It cleans up the
+people it creates as well, because `resetChallenge` clears entries and never
+people.
+
+The page tests live beside the pages, with the rig in `src/test/harness.ts`. Two
+things about it are deliberate and will look wrong otherwise:
+
+- Fake query results are keyed by `getFunctionName`, not by reference.
+  `api.people.listPeople` is an `anyApi` proxy that returns a fresh object on
+  every access, so comparing references silently never matches.
+- Its `matchMedia` **does not fire change events by default.** That is the
+  browser behaviour being reproduced, not a shortcut — see the layout note below.
+  Tests that want the healthy path ask for it explicitly.
+
+Only the page files opt into jsdom, with a `@vitest-environment` docblock, so the
+pure tests stay in node.
 
 ---
 
@@ -113,12 +177,35 @@ The acceptance suite **writes real entries and then resets**, so it must not be 
 - **Do not put large JS or TSX inside a bash heredoc.** It fails with "unexpected EOF". Write the file directly instead.
 - **Backticks inside a double-quoted `node -e "..."` are executed by bash.** This accidentally ran two launcher scripts. Use a script file.
 - If a browser preview pane is collapsed, `document.documentElement` measures **0 width** — every layout measurement is then meaningless and screenshots fail. Set an explicit viewport size before measuring.
+- A pane that is not **displayed** does not composite frames: screenshots time out, and CSS transitions never advance, so an element sits frozen at its starting value. That looks exactly like a layout bug and is not one. Disable the transition before measuring.
 - Verify layout by measuring section heights out of the DOM, not by eye. Several real bugs were only caught that way, and one "bug" turned out to be the measuring environment rather than the CSS.
+- **A viewport override via devtools fires neither `resize` nor `matchMedia` change.** So resizing the pane cannot prove a responsive layout works; dispatch the event by hand to test that path.
+
+## Three that got through, and what they have in common
+
+Each shipped because it only misbehaves somewhere nobody was looking.
+
+- **`matchMedia` change is not guaranteed to arrive.** The board chose between the
+  TV and phone layouts off that single event, and it was measured firing *zero*
+  times at 1912px wide with `matches` already `false`. A cast tab is resized by the
+  TV as it connects, which is exactly when it would latch — and then the gym looks
+  at the phone layout for a month. `useIsNarrow` now also listens for `resize` and
+  re-reads on mount.
+- **A `v.id()` validator rejects before the handler runs, and `useQuery` rethrows
+  that during render.** `/me` sent a remembered id straight to one, so a person
+  removed, a reset, or a phone that had once opened dev gave a blank white page
+  with no way out. `personStats` takes `v.string()` and normalizes instead.
+- **Derived assets go stale as silently as derived data.** `halfway.jpg` was a
+  marquee sign reading "20 MILLION", left from the world-tour route, and
+  Celebration draws the real figure on top of the postcard — so the TV would have
+  shown 4,236,674 over a much larger wrong number. The postcard is a **backdrop**,
+  never a card: it sits behind a wash at 28% with the facts drawn over it, so never
+  print a number into one.
 
 ## Suggested skills
 
-- **`taste-skill`** — for the gauge bar. It is a UI/UX judgement call, which is what that skill is for.
-- **`code-review`** — worth a pass over the branch before the PR merges; 27 commits, never reviewed.
+- **`code-review`** — never done. 37 commits went to `main` unreviewed.
+- **`taste-skill`** — for UI/UX judgement calls like the gauge bar was.
 - **`wizard`** — only if something needs James to perform steps himself. Three already exist in `scripts/` (`first-deploy.sh`, `postcards.sh`, `launch-day.sh`); match their shape.
 
 Not `dataviz` — the visuals here are bespoke SVG and canvas, not charts.

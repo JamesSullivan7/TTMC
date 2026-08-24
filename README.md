@@ -8,14 +8,23 @@ Westbound first, so the gym leaves town on Route 66 — which runs through Tulsa
 
 Every meter someone rows is a meter of road. There is no map scale and nothing hidden — see [Sizing](#sizing-the-route) for why that works out.
 
-## Three surfaces
+## Seven surfaces
 
 | URL | Who | What |
 |---|---|---|
 | `/` | anyone watching, and the trainer computer | the map, the milestone feed, per-machine totals |
 | `/tv` | the gym TV, usually a cast tab | the display layout, locked — no trainer UI, nothing to log in to |
 | `/log` | a member's phone | log your own meters, reached by scanning a machine's QR |
+| `/me` | a member's phone | what you have done, and on which machines |
+| `/join` | a member's phone | claim your meters before September |
+| `/pledge` | the gym TV, before the 1st | the pledge board — `/tv` serves this until the challenge starts |
+| `/pledges` | a trainer | who pledged what, searchable, and who has not pledged yet |
 | `/qr` | a trainer, once | print the QR cards to tape on the machines |
+
+`/me` and `/join` are only ever reached by scanning a printed card, so both take
+the log token in the URL and strip it back out of the address bar — one scan
+sets a phone up to pledge now, check its own meters, and log more later, and a
+screenshot of either page leaks nothing.
 
 There is no router library — `src/main.tsx` checks the path. `vercel.json` rewrites everything to `index.html` so those survive a refresh.
 
@@ -132,7 +141,7 @@ That is a real margin, not a rounding error, and it is deliberate. The gym has t
 npm install
 npx convex dev --once   # syncs backend functions (first time on a new machine)
 npm run dev             # local dev server
-npm test                # 28 tests over the route data, geometry and units
+npm test                # 57 tests: route data, geometry, units, and the two pages
 ```
 
 Backend: Convex project `tt-world-tour` (team `james-7ecd5`). Dev deployment `fine-eagle-220`, production `utmost-gopher-81`. URLs live in `.env.local`.
@@ -151,7 +160,7 @@ By hand: `npx convex deploy`, set both keys with `npx convex env set ... --prod`
 
 ## Postcards
 
-Each milestone can have a photo behind its celebration, at `public/postcards/<file>.jpg`. **20 of the 42 are in place.** Reversing the route direction cost none of them — the cities are the same, only the order changed.
+Each milestone can have a photo behind its celebration, at `public/postcards/<file>.jpg`. **23 of the 42 are in place**, and `docs/postcards-needed.md` lists every one still missing with a search for it. Reversing the route direction cost none of them — the cities are the same, only the order changed.
 
 ```
 bash scripts/postcards.sh
@@ -202,7 +211,7 @@ in `scripts/` for both platforms that handle this and open kiosk mode:
 npm run acceptance -- <ADMIN_KEY> <LOG_TOKEN> <TRAINER_PIN>
 ```
 
-44 checks against the running site and its Convex deployment: that the three key
+68 checks against the running site and its Convex deployment: that the three key
 tiers genuinely separate — in particular that the four-digit trainer PIN cannot reset or simulate — that input validation holds, that the Assault Bike
 converts miles, that neither key leaks into the shipped bundle, and that a burst
 of 30 concurrent logs produces no write conflicts.
