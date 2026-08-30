@@ -203,6 +203,7 @@ write_env PROD_SITE_URL "$PROD_SITE_URL"
 
 say ""
 _mut() { curl -s -X POST "$PROD_CONVEX_URL/api/mutation" -H 'Content-Type: application/json' -d "$1"; }
+_qry() { curl -s -X POST "$PROD_CONVEX_URL/api/query" -H 'Content-Type: application/json' -d "$1"; }
 FAILED=0
 
 step "site is up"
@@ -221,7 +222,13 @@ if _mut '{"path":"worldTour:logEntry","args":{"machine":"Row","amount":100},"for
 else printf '  %s✗ logging is open to anyone%s\n' "$RED" "$RESET"; FAILED=1; fi
 
 step "your trainer key works"
-if _mut "{\"path\":\"worldTour:verifyAdmin\",\"args\":{\"key\":\"$PROD_ADMIN_KEY\"},\"format\":\"json\"}" | grep -q '"status":"success"'; then
+# isAdmin, not verifyAdmin - there has never been a function by that name, so
+# this check failed against every deployment and took the whole wizard down
+# with it at stage 1, on the one morning it exists to be run.
+#
+# It is a query, and it answers success/true rather than erroring, so the value
+# has to be read: a wrong key is a successful call returning false.
+if _qry "{\"path\":\"worldTour:isAdmin\",\"args\":{\"key\":\"$PROD_ADMIN_KEY\"},\"format\":\"json\"}" | grep -q '"value":true'; then
   printf '  %s✓%s\n' "$GREEN" "$RESET"
 else printf '  %s✗ that key is not accepted%s\n' "$RED" "$RESET"; FAILED=1; fi
 
