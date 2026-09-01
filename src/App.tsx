@@ -336,7 +336,16 @@ export default function App({ castMode = false }: { castMode?: boolean }) {
   }
 
   return (
-    <div className="min-h-screen text-white bg-[#050505]">
+    // A television crops the edges of what it is sent - overscan, a habit
+    // inherited from CRTs that TCL and Roku sets still default to and do not
+    // always let you turn off. Content flush to the edge is simply not on the
+    // wall. Broadcast calls the surviving region title-safe; this is a smaller
+    // version of that inset, applied only when the layout is on a TV, because
+    // on a laptop it would just be wasted margin.
+    <div
+      className="min-h-screen text-white bg-[#050505]"
+      style={tvMode ? { padding: '2.2vh 2.8vw', overflow: 'hidden' } : undefined}
+    >
       {celeb && !replaying && (
         <Celebration milestone={celeb} day={day} onDone={() => setCelebQueue((q) => q.slice(1))} />
       )}
@@ -405,7 +414,7 @@ export default function App({ castMode = false }: { castMode?: boolean }) {
       {/* ── Map hero ── */}
       <div
         className="relative w-full"
-        style={{ height: tvMode ? '72vh' : '58vh', background: '#050505' }}
+        style={{ height: tvMode ? '67vh' : '58vh', background: '#050505' }}
         onDoubleClick={tvMode && !castMode ? exitTvMode : undefined}
       >
         <MapView totalMeters={shownTotal} paceMeters={replaying ? 0 : pace ?? 0} />
