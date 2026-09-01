@@ -1,6 +1,6 @@
 import { mutation, query } from './_generated/server'
 import { v } from 'convex/values'
-import { MACHINE_NAMES, machineUnit, toMeters, unitAbbrev } from './machines'
+import { MACHINE_NAMES, machineUnit, metersPerUnit, toMeters, unitAbbrev } from './machines'
 
 // Map scale. The Tulsa -> New York -> Los Angeles -> Tulsa route is 8,473 km,
 // which the gym covers in ~31 days at its real output — so this is 1, and the
@@ -178,7 +178,7 @@ export const logEntry = mutation({
 
     const meters = toMeters(machine, amount)
     if (meters > MAX_SINGLE_ENTRY) {
-      const cap = unit === 'miles' ? MAX_SINGLE_ENTRY / 1609.344 : MAX_SINGLE_ENTRY
+      const cap = MAX_SINGLE_ENTRY / metersPerUnit(unit)
       throw new Error(
         `Max single entry is ${Math.floor(cap).toLocaleString('en-US')} ${unitAbbrev(unit)}`
       )

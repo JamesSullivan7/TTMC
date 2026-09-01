@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import { MACHINES, MACHINE_COLORS, BRAND, fmt, Machine, challengeDay } from './config'
-import { machineUnit, toMeters, unitAbbrev, unitLabel } from '../convex/machines'
+import { machineUnit, parseAmount, toMeters, unitAbbrev, unitLabel } from '../convex/machines'
 import { getTrainerKey, getLogKey, isAuthError } from './keys'
 import PersonPicker, { Pickable } from './PersonPicker'
 import LogResult, { LogOutcome } from './LogResult'
@@ -27,12 +27,12 @@ export function EntryForm() {
   // The label, placeholder and step all follow the selected machine's screen —
   // a trainer should type exactly the number in front of them, nothing more.
   const unit = machine ? machineUnit(machine) : null
-  const isMiles = unit === 'miles'
+  const isDistance = unit === 'km' || unit === 'miles'
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const n = Number(amount)
-    if (!machine || !n || n <= 0 || unit === null) return
+    const n = machine ? parseAmount(machine, amount) : null
+    if (!machine || n === null || unit === null) return
 
     const asMeters = toMeters(machine, n)
     if (
@@ -112,19 +112,18 @@ export function EntryForm() {
         <div>
           <label
             className="block text-xs mb-1 uppercase tracking-wider"
-            style={{ color: isMiles ? BRAND.pink : '#71717a' }}
+            style={{ color: isDistance ? BRAND.pink : '#71717a' }}
           >
             {unit ? unitLabel(unit) : 'Distance'}
           </label>
           <input
-            type="number"
+            type="text"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder={isMiles ? 'e.g. 5.2' : 'e.g. 2000'}
+            placeholder={isDistance ? 'e.g. 2,08' : 'e.g. 2000'}
             min={0}
-            step={isMiles ? 0.01 : 1}
             className="bg-zinc-900 border text-white text-sm rounded-lg px-3 py-2 w-32 focus:outline-none placeholder:text-zinc-600"
-            style={{ borderColor: isMiles ? BRAND.darkRed : '#3f3f46' }}
+            style={{ borderColor: isDistance ? BRAND.darkRed : '#3f3f46' }}
           />
         </div>
         <button
@@ -141,9 +140,9 @@ export function EntryForm() {
                 ? `Log for ${person.firstName}`
                 : 'Log it'}
         </button>
-        {isMiles && status !== 'done' && (
+        {isDistance && status !== 'done' && (
           <span className="text-[11px] self-center" style={{ color: BRAND.pink }}>
-            Reads in miles — type what the screen says
+            Reads in {unit === 'km' ? 'kilometers' : 'miles'} — type what the screen says
           </span>
         )}
         {errorMsg && (
@@ -238,7 +237,7 @@ export function RecentEntries() {
       <div className="text-xs text-zinc-500 uppercase tracking-widest mb-2">Recent entries</div>
       <div className="space-y-1">
         {recent.map((e) => {
-          const typedInMiles = e.unit === 'miles' && e.input !== null
+          const typedInOwnUnit = e.unit !== null && e.unit !== 'meters' && e.input !== null
           return (
             <div key={e.id} className="flex items-center gap-2 text-xs">
               <span
@@ -252,9 +251,9 @@ export function RecentEntries() {
               {/* Show what was typed, so a trainer can check an entry against
                   the machine's screen without converting in their head. */}
               <span className="text-white font-bold tabular-nums">
-                {typedInMiles ? `${e.input} mi` : `${fmt(e.meters)} m`}
+                {typedInOwnUnit ? `${e.input} ${e.unit === 'km' ? 'km' : 'mi'}` : `${fmt(e.meters)} m`}
               </span>
-              {typedInMiles && (
+              {typedInOwnUnit && (
                 <span className="text-zinc-500 tabular-nums">({fmt(e.meters)} m)</span>
               )}
               <span className="text-zinc-600 tabular-nums">→ {fmt(e.journeyMeters)} m</span>

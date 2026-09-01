@@ -102,7 +102,9 @@ then strips it from the address bar, so a screenshot does not leak it.
 
 ## Machines and units
 
-The **Assault Bike reads in miles**; everything else reads in meters. The unit is part of the machine definition in `convex/machines.ts`, shared by the server and the UI, and conversion happens server-side — so nothing downstream ever holds a number whose unit is ambiguous. The form follows the machine: the label switches to Miles, decimals are allowed, and a live line shows `6.4 mi = 10,300 meters` before you commit.
+The **Assault Bike reads in kilometers**; everything else reads in meters. The unit is part of the machine definition in `convex/machines.ts`, shared by the server and the UI, and conversion happens server-side — so nothing downstream ever holds a number whose unit is ambiguous. The form follows the machine: the label switches to Kilometers, decimals are allowed, and a live line shows `2.08 km = 2,080 meters` before you commit.
+
+The bike's screen writes a **decimal comma** — `02,08` is 2.08 km — so `parseAmount` reads the separator by unit rather than guessing: on a distance machine a comma is the decimal point, on a meters machine it can only be a thousands mark (`2,000` is 2000). Guessing wrong is a silent 100x error in either direction, which is why the machine decides and not a digit-counting heuristic.
 
 Adding or changing a machine is one entry in that file.
 
@@ -213,7 +215,7 @@ npm run acceptance -- <ADMIN_KEY> <LOG_TOKEN> <TRAINER_PIN>
 
 68 checks against the running site and its Convex deployment: that the three key
 tiers genuinely separate — in particular that the four-digit trainer PIN cannot reset or simulate — that input validation holds, that the Assault Bike
-converts miles, that neither key leaks into the shipped bundle, and that a burst
+converts kilometers, that neither key leaks into the shipped bundle, and that a burst
 of 30 concurrent logs produces no write conflicts.
 
 It writes a handful of real entries and then resets, so only run it against a

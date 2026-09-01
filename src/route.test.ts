@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ACTS, GOAL, MILESTONES, ROUTE, crossedMilestones, fmtKm } from './config'
 import { STATE_CROSSINGS } from './stateCrossings'
 import { locationLabel, positionAt } from './geo'
-import { MACHINES, machineUnit, toMeters } from '../convex/machines'
+import { MACHINES, machineUnit, parseAmount, toMeters } from '../convex/machines'
 
 // The route is data, and data rots quietly. A milestone out of order or a city
 // missing a coordinate produces no error — just a map that draws itself wrong
@@ -198,16 +198,17 @@ describe('crossedMilestones', () => {
 })
 
 describe('machine units', () => {
-  it('reads the Assault Bike in miles and everything else in meters', () => {
-    expect(machineUnit('Assault Bike')).toBe('miles')
+  it('reads the Assault Bike in kilometers and everything else in meters', () => {
+    expect(machineUnit('Assault Bike')).toBe('km')
     for (const m of MACHINES.filter((x) => x.name !== 'Assault Bike')) {
       expect(machineUnit(m.name)).toBe('meters')
     }
   })
 
-  it('converts miles off the bike screen into real meters', () => {
-    expect(toMeters('Assault Bike', 5)).toBeCloseTo(8046.72, 2)
-    expect(toMeters('Assault Bike', 12.4)).toBeCloseTo(19955.87, 2)
+  it('converts kilometers off the bike screen into real meters', () => {
+    expect(toMeters('Assault Bike', 2.08)).toBeCloseTo(2080, 6)
+    expect(toMeters('Assault Bike', 2.6)).toBeCloseTo(2600, 6)
+    expect(toMeters('Assault Bike', 12.4)).toBeCloseTo(12400, 6)
   })
 
   it('leaves meter machines alone', () => {
@@ -220,10 +221,61 @@ describe('machine units', () => {
     expect(machineUnit('Treadmill')).toBeNull()
   })
 
-  it('never silently treats miles as meters', () => {
-    // The bug this whole unit system exists to prevent: 5 off the bike screen
-    // must never become 5 meters.
-    expect(toMeters('Assault Bike', 5)).not.toBe(5)
+  it('never silently treats kilometers as meters', () => {
+    // The bug this whole unit system exists to prevent: 2.6 off the bike
+    // screen must never become 2.6 meters.
+    expect(toMeters('Assault Bike', 2.6)).not.toBe(2.6)
+    expect(toMeters('Assault Bike', 2.6)).toBe(2600)
+  })
+})
+
+describe('parseAmount', () => {
+  // The Assault Bike writes a decimal comma: "02,08" is 2.08 km, not 208.
+  it('reads the decimal comma on the bike screen as a decimal point', () => {
+    expect(parseAmount('Assault Bike', '02,08')).toBe(2.08)
+    expect(parseAmount('Assault Bike', '2,6')).toBe(2.6)
+    expect(parseAmount('Assault Bike', '0,95')).toBe(0.95)
+  })
+
+  it('reads a decimal point just the same', () => {
+    expect(parseAmount('Assault Bike', '2.08')).toBe(2.08)
+    expect(parseAmount('Assault Bike', '2.6')).toBe(2.6)
+  })
+
+  it('keeps leading zeros harmless', () => {
+    expect(parseAmount('Assault Bike', '02,08')).toBe(2.08)
+    expect(parseAmount('Assault Bike', '007')).toBe(7)
+  })
+
+  it('treats a comma on a meters machine as a thousands separator', () => {
+    // A rower never shows a fraction, so "2,000" can only mean 2000 — the
+    // opposite reading of the same character, which is why the unit decides.
+    expect(parseAmount('Row', '2,000')).toBe(2000)
+    expect(parseAmount('Row', '12,500')).toBe(12500)
+    expect(parseAmount('Row', '2000')).toBe(2000)
+  })
+
+  it('end to end: what is typed becomes the right number of meters', () => {
+    const km = parseAmount('Assault Bike', '02,08')!
+    expect(toMeters('Assault Bike', km)).toBe(2080)
+
+    const m = parseAmount('Row', '2,000')!
+    expect(toMeters('Row', m)).toBe(2000)
+  })
+
+  it('refuses anything that is not a single positive number', () => {
+    for (const bad of ['', '   ', 'abc', '1.2.3', '1,2,3', '-5', '0', '5m', '2 km', '.']) {
+      expect(parseAmount('Assault Bike', bad)).toBeNull()
+    }
+  })
+
+  it('refuses a machine it does not know', () => {
+    expect(parseAmount('Treadmill', '5')).toBeNull()
+  })
+
+  it('tolerates stray whitespace', () => {
+    expect(parseAmount('Assault Bike', '  2,08  ')).toBe(2.08)
+    expect(parseAmount('Row', ' 2000 ')).toBe(2000)
   })
 })
 

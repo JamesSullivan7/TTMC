@@ -14,7 +14,7 @@ import {
   fmt,
   fmtKm,
 } from './config'
-import { machineUnit, toMeters, unitAbbrev, unitLabel } from '../convex/machines'
+import { machineUnit, parseAmount, toMeters, unitAbbrev, unitLabel } from '../convex/machines'
 import { locationLabel } from './geo'
 import { downloadShareCard } from './shareCard'
 import { getLogKey, getLogToken, setLogToken, getPersonId, setPersonId, clearPersonId } from './keys'
@@ -87,13 +87,14 @@ export default function LogPage() {
 
   const hasToken = getLogToken() !== '' || getLogKey() !== ''
   const unit = machine ? machineUnit(machine) : null
-  const isMiles = unit === 'miles'
+  const isDistance = unit === 'km' || unit === 'miles'
+  const parsed = machine ? parseAmount(machine, amount) : null
   const total = summary?.totalJourney ?? 0
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    const n = Number(amount)
-    if (!machine || !n || n <= 0 || unit === null || busy) return
+    const n = machine ? parseAmount(machine, amount) : null
+    if (!machine || n === null || unit === null || busy) return
     setBusy(true)
     setError('')
     // Taken from the live subscription, not returned by the mutation — which
@@ -320,25 +321,23 @@ export default function LogPage() {
                   <span className="text-xs uppercase tracking-widest text-zinc-500">
                     {unit ? unitLabel(unit) : 'Distance'}
                   </span>
-                  {isMiles && (
+                  {isDistance && (
                     <span className="text-[11px] font-bold" style={{ color: BRAND.pink }}>
-                      this one reads in miles
+                      this one reads in {unit === 'km' ? 'kilometers' : 'miles'}
                     </span>
                   )}
                 </div>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
                   autoFocus
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  placeholder={isMiles ? '5.2' : '2000'}
-                  min={0}
-                  step={isMiles ? 0.01 : 1}
+                  placeholder={isDistance ? '2,08' : '2000'}
                   className="mt-2 w-full bg-[#0d0d0d] text-white text-center rounded-xl px-4 py-5 focus:outline-none placeholder:text-zinc-700 font-display"
                   style={{
                     fontSize: '3rem',
-                    border: `1.5px solid ${isMiles ? BRAND.darkRed : '#2a2a2a'}`,
+                    border: `1.5px solid ${isDistance ? BRAND.darkRed : '#2a2a2a'}`,
                   }}
                 />
                 <div className="mt-1.5 text-center text-xs text-zinc-600">
@@ -347,18 +346,20 @@ export default function LogPage() {
 
                 <button
                   type="submit"
-                  disabled={!amount || busy}
+                  disabled={parsed === null || busy}
                   className="mt-5 w-full py-5 rounded-xl font-black text-base uppercase tracking-widest transition-all disabled:opacity-40"
                   style={{ background: BRAND.red, color: '#fff' }}
                 >
                   {busy ? 'Logging…' : 'Log it'}
                 </button>
 
-                {amount && unit && Number(amount) > 0 && (
+                {amount.trim() !== '' && unit && machine && (
                   <div className="mt-2 text-center text-xs text-zinc-500">
-                    {isMiles
-                      ? `${amount} ${unitAbbrev(unit)} = ${fmt(toMeters(machine, Number(amount)))} meters`
-                      : `${fmt(Number(amount))} meters down the road`}
+                    {parsed === null
+                      ? 'that is not a number I can read'
+                      : isDistance
+                        ? `${parsed} ${unitAbbrev(unit)} = ${fmt(toMeters(machine, parsed))} meters`
+                        : `${fmt(parsed)} meters down the road`}
                   </div>
                 )}
               </>

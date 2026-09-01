@@ -9,7 +9,7 @@
 //   npx convex env get TRAINER_PIN --prod
 //
 // It checks the permission tiers actually separate, that the Assault Bike
-// converts miles, that no key leaks into the shipped bundle, and that a
+// converts kilometers, that no key leaks into the shipped bundle, and that a
 // burst of concurrent logs produces no write conflicts.
 import { readdir, readFile } from 'node:fs/promises'
 
@@ -79,18 +79,18 @@ check('rejects zero', denied(await mut('logEntry', { machine: 'Row', amount: 0, 
 check('rejects negative', denied(await mut('logEntry', { machine: 'Row', amount: -500, key: LOG })))
 const over = await mut('logEntry', { machine: 'Row', amount: 70000, key: LOG })
 check('rejects over-cap in METERS', denied(over) )
-const overMi = await mut('logEntry', { machine: 'Assault Bike', amount: 40, key: LOG })
-check('rejects over-cap in MILES', denied(overMi))
+const overKm = await mut('logEntry', { machine: 'Assault Bike', amount: 70, key: LOG })
+check('rejects over-cap in KM', denied(overKm))
 
 console.log('\n\x1b[1mC · UNIT CONVERSION (the silent-bug class)\x1b[0m')
-const bike = await mut('logEntry', { machine: 'Assault Bike', amount: 5, key: LOG })
-check('5 mi on the bike -> 8047 m', ok(bike) && bike.value.meters === 8047, JSON.stringify(bike.value))
+const bike = await mut('logEntry', { machine: 'Assault Bike', amount: 2.08, key: LOG })
+check('2.08 km on the bike -> 2080 m', ok(bike) && bike.value.meters === 2080, JSON.stringify(bike.value))
 const bike2 = await mut('logEntry', { machine: 'Assault Bike', amount: 12.4, key: LOG })
-check('12.4 mi -> 19956 m', ok(bike2) && bike2.value.meters === 19956, JSON.stringify(bike2.value))
+check('12.4 km -> 12400 m', ok(bike2) && bike2.value.meters === 12400, JSON.stringify(bike2.value))
 const row = await mut('logEntry', { machine: 'Row', amount: 2000, key: LOG })
 check('2000 m on the rower stays 2000 m', ok(row) && row.value.meters === 2000, JSON.stringify(row.value))
 const runner = await mut('logEntry', { machine: 'Assault Runner', amount: 1800, key: LOG })
-check('runner reads METERS not miles', ok(runner) && runner.value.meters === 1800, JSON.stringify(runner.value))
+check('runner reads METERS not km', ok(runner) && runner.value.meters === 1800, JSON.stringify(runner.value))
 check('journey == real (MULTIPLIER is 1)', ok(row) && row.value.journeyMeters === row.value.meters)
 
 console.log('\n\x1b[1mD · QUERIES + SITE\x1b[0m')
@@ -98,7 +98,7 @@ const sum = await qry('getSummary', {})
 check('getSummary is public', ok(sum))
 check('byMachine covers all 5 machines', ok(sum) && Object.keys(sum.value.byMachine).length === 5)
 const recent = await qry('getRecent', {})
-check('getRecent preserves the typed unit', ok(recent) && recent.value.some((e) => e.unit === 'miles' && e.input === 5))
+check('getRecent preserves the typed unit', ok(recent) && recent.value.some((e) => e.unit === 'km' && e.input === 2.08))
 for (const p of ['/', '/log', '/qr']) {
   const r = await fetch(SITE + p)
   check('site serves ' + p, r.status === 200)
