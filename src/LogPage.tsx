@@ -38,6 +38,7 @@ type Outcome = {
 
 export default function LogPage() {
   const logEntry = useMutation(api.worldTour.logEntry)
+  const addPerson = useMutation(api.people.addPerson)
   const summary = useQuery(api.worldTour.getSummary)
   const people = useQuery(api.people.listPeople)
 
@@ -275,6 +276,15 @@ export default function LogPage() {
                 handed to a friend at the machine, so it stays changeable. */}
             <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Who is logging?</div>
             <PersonPicker
+            onCreate={async (firstName, lastName) => {
+              try {
+                const made = await addPerson({ key: getLogKey(), firstName, lastName })
+                return { id: made.id as unknown as string, name: made.name,
+                           firstName, lastName }
+              } catch {
+                return null
+              }
+            }}
               people={people}
               value={who}
               onChange={(p) => {
@@ -286,10 +296,8 @@ export default function LogPage() {
             {!who && (
               <div className="mt-2 text-xs text-zinc-500 leading-relaxed">
                 Pick your name to log — meters have to land on somebody to count toward
-                your pledge and your badges.{' '}
-                <a href="/join" className="underline" style={{ color: BRAND.pink }}>
-                  Not on the list? Pledge first.
-                </a>
+                your pledge and your badges. Not on the list? Type your full name and
+                add yourself.
               </div>
             )}
 

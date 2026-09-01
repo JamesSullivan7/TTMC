@@ -12,6 +12,7 @@ const BIG_ENTRY_METERS = 30_000
 
 export function EntryForm() {
   const logEntry = useMutation(api.worldTour.logEntry)
+  const addPerson = useMutation(api.people.addPerson)
   // The running total comes from this live subscription rather than from the
   // mutation, which no longer reads it — see the note in convex/worldTour.ts.
   const summary = useQuery(api.worldTour.getSummary)
@@ -87,6 +88,15 @@ export function EntryForm() {
         <div style={{ width: '13rem' }}>
           <label className="block text-zinc-500 text-xs mb-1 uppercase tracking-wider">Who</label>
           <PersonPicker
+          onCreate={async (firstName, lastName) => {
+            try {
+              const made = await addPerson({ key: getLogKey(), firstName, lastName })
+              return { id: made.id as unknown as string, name: made.name,
+                       firstName, lastName }
+            } catch {
+              return null
+            }
+          }}
             people={people}
             value={person}
             onChange={setPerson}

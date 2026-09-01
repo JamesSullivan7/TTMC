@@ -150,6 +150,58 @@ export const pledgeTotal = query({
 // Seed the roster from the gym's member list. Admin-gated, and idempotent —
 // re-running after the list is updated adds the new people and leaves everyone
 // else, including their pledges, untouched.
+// Add somebody the roster does not have, from the logging form itself.
+//
+// The roster came from the gym's member list, so it is a snapshot: it misses
+// anyone who joined afterwards, anyone spelled differently on the sheet, and
+// anyone the list simply never had. Requiring attribution without this would
+// mean a trainer at the desk has to send a real person standing in front of
+// them to a different page before their meters can be logged.
+//
+// Gated on the same key as logging rather than the admin key - whoever may log
+// meters may name the person they are for. Idempotent on nameLower, so a
+// double tap returns the existing person instead of splitting them into two
+// rows, which is the whole reason the roster exists.
+export const addPerson = mutation({
+  args: { key: v.string(), firstName: v.string(), lastName: v.string() },
+  handler: async (ctx, { key, firstName, lastName }) => {
+    const logToken = process.env.LOG_TOKEN
+    const pin = process.env.TRAINER_PIN
+    const admin = process.env.ADMIN_KEY
+    if (!((logToken && key === logToken) || (pin && key === pin) || (admin && key === admin))) {
+      throw new Error('Not authorized')
+    }
+
+    const first = displayCase(clean(firstName))
+    const last = displayCase(clean(lastName))
+    if (first.length < 2) throw new Error('Please enter a first name')
+    if (last.length < 1) throw new Error('Please enter a last name')
+    if (first.length > 40 || last.length > 40) throw new Error('That name is too long')
+
+    const name = `${first} ${last}`
+    const nameLower = name.toLowerCase()
+
+    const existing = await ctx.db
+      .query('people')
+      .withIndex('by_nameLower', (q) => q.eq('nameLower', nameLower))
+      .unique()
+    if (existing) return { id: existing._id, name: existing.name, created: false }
+
+    await checkRate(ctx)
+    // pledgedAt 0 marks a roster entry: known to the app, not yet committed to
+    // anything, and therefore not on the board until they pledge.
+    const id = await ctx.db.insert('people', {
+      firstName: first,
+      lastName: last,
+      name,
+      nameLower,
+      pledgeMeters: 0,
+      pledgedAt: 0,
+    })
+    return { id, name, created: true }
+  },
+})
+
 export const importRoster = mutation({
   args: {
     key: v.string(),

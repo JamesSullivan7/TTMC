@@ -22,13 +22,18 @@ export default function PersonPicker({
   onChange,
   placeholder = 'Type a name…',
   compact = false,
+  onCreate,
 }: {
   people: Pickable[] | undefined
   value: Pickable | null
   onChange: (p: Pickable | null) => void
   placeholder?: string
   compact?: boolean
+  // Add somebody the roster does not have. Optional: where it is not passed,
+  // the picker stays a pure chooser.
+  onCreate?: (firstName: string, lastName: string) => Promise<Pickable | null>
 }) {
+  const [adding, setAdding] = useState(false)
   const [q, setQ] = useState('')
 
   // The × button clears the typed text alongside the selection. A parent that
@@ -105,8 +110,46 @@ export default function PersonPicker({
         >
           {matches.length === 0 ? (
             <div className="px-3 py-3 text-sm text-zinc-500">
-              No match. Check the spelling — everyone logging has to be on the
-              roster, and anyone missing pledges first at /join.
+              {(() => {
+                // Only offer to add once there is a first and a last name to
+                // add. One word is far more likely a half-typed search than a
+                // person, and a roster that gains a "Sar" helps nobody.
+                const words = q.trim().split(/\s+/).filter(Boolean)
+                if (!onCreate || words.length < 2) {
+                  return 'No match. Check the spelling — try a first or last name.'
+                }
+                const first = words[0]
+                const last = words.slice(1).join(' ')
+                const shown = `${first} ${last}`
+                return (
+                  <div className="space-y-2">
+                    <div>Nobody by that name yet.</div>
+                    <button
+                      type="button"
+                      disabled={adding}
+                      onClick={async () => {
+                        setAdding(true)
+                        try {
+                          const made = await onCreate(first, last)
+                          if (made) {
+                            onChange(made)
+                            setQ('')
+                          }
+                        } finally {
+                          setAdding(false)
+                        }
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-lg font-bold text-white transition-opacity disabled:opacity-50"
+                      style={{ background: BRAND.darkRed, border: `1px solid ${BRAND.red}` }}
+                    >
+                      {adding ? 'Adding…' : `+ Add ${shown}`}
+                    </button>
+                    <div className="text-xs text-zinc-600">
+                      Check the spelling first — this puts them on the roster.
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           ) : (
             matches.map((p) => (

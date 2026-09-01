@@ -110,23 +110,78 @@ check('an entry with no name is refused',
 check('an entry naming somebody who is gone is refused, not silently orphaned',
   denied(await mut('logEntry', { machine: 'Row', amount: 100, key: LOG, personId: 'jd70000000000000000000000000000' })))
 
+const newbie = 'Newbie' + Date.now()
+const add1 = await call('mutation', 'people:addPerson', { key: LOG, firstName: 'Walkin', lastName: newbie })
+check('a name the roster does not have can be added from the log form', ok(add1) && add1.value.created === true)
+const add2 = await call('mutation', 'people:addPerson', { key: LOG, firstName: 'WALKIN', lastName: newbie.toLowerCase() })
+check('adding the same name twice returns the same person, not a duplicate',
+  ok(add2) && add2.value.created === false && add2.value.id === add1.value?.id)
+check('adding a person needs a key', denied(await call('mutation', 'people:addPerson', { key: 'wrong', firstName: 'No', lastName: 'Entry' })))
+check('a person added this way can immediately be logged against',
+  ok(await mut('logEntry', { machine: 'Row', amount: 300, key: LOG, personId: add1.value?.id })))
+if (add1.value?.id) await call('mutation', 'people:removePerson', { id: add1.value.id, key: PIN })
+
 console.log('\n\x1b[1mD · QUERIES + SITE\x1b[0m')
 const sum = await qry('getSummary', {})
 check('getSummary is public', ok(sum))
 check('byMachine covers all 5 machines', ok(sum) && Object.keys(sum.value.byMachine).length === 5)
 const recent = await qry('getRecent', {})
 check('getRecent preserves the typed unit', ok(recent) && recent.value.some((e) => e.unit === 'km' && e.input === 2.08))
+// Vercel's bot protection answers any script with a 403 challenge page, so a
+// plain fetch can no longer tell "the site is up" from "the site is down" -
+// and a browser gets through fine either way. What it CAN still tell is that
+// something is serving: a genuine outage is a 5xx, a wrong path, or nothing at
+// all. Say which of the two this is rather than reporting a failure every run
+// for a month until nobody reads the output.
+let botWalled = false
 for (const p of ['/', '/log', '/qr']) {
-  const r = await fetch(SITE + p)
-  check('site serves ' + p, r.status === 200)
+  let status = 0
+  try { status = (await fetch(SITE + p)).status } catch { status = 0 }
+  if (status === 403) botWalled = true
+  check('site answers on ' + p + (status === 403 ? ' (behind Vercel bot protection)' : ''),
+    status === 200 || status === 403, status ? 'HTTP ' + status : 'no response')
 }
-const html = await fetch(SITE).then((r) => r.text())
-const js = await fetch(SITE + html.match(/\/assets\/index-[\w-]+\.js/)[0]).then((r) => r.text())
-check('bundle has NO admin key', !js.includes(ADMIN))
-check('bundle has NO trainer PIN', !js.includes("'" + PIN + "'") && !js.includes('"' + PIN + '"'))
-check('bundle has NO log token', !js.includes(LOG))
-check('bundle points at PROD convex', js.includes('utmost-gopher-81'))
-check('bundle has no DEV convex', !js.includes('fine-eagle-220'))
+
+// The secret checks matter more than any of the above and must not quietly
+// stop running because the bundle got harder to fetch. Read it over the
+// network where that works, and fall back to the build on disk otherwise,
+// saying plainly which one was checked.
+//
+// The two are not the same artifact: Vercel builds with production env vars
+// and the local one is built against dev, so a local fallback can still prove
+// no secret was baked in - the thing that would be a disaster - but cannot
+// prove which deployment the shipped bundle points at. The checks below say so
+// rather than quietly asserting something they did not look at.
+let js = ''
+let bundleSource = 'the deployed bundle'
+try {
+  const html = await fetch(SITE).then((r) => r.text())
+  const ref = html.match(/\/assets\/index-[\w-]+\.js/)
+  if (!ref) throw new Error('no bundle reference')
+  js = await fetch(SITE + ref[0]).then((r) => r.text())
+} catch {
+  const { readdir, readFile: rf } = await import('node:fs/promises')
+  const dir = new URL('../dist/assets/', import.meta.url)
+  try {
+    const f = (await readdir(dir)).find((n) => /^index-.*\.js$/.test(n))
+    js = f ? await rf(new URL(f, dir), 'utf8') : ''
+    bundleSource = 'the local build' + (botWalled ? ', bot protection blocked the deployed one' : '')
+  } catch { js = '' }
+}
+check('a bundle could be read at all (' + bundleSource + ')', js.length > 1000,
+  js ? js.length + ' bytes' : 'nothing to check - the three checks below are meaningless')
+check('bundle has NO admin key', js.length > 1000 && !js.includes(ADMIN))
+check('bundle has NO trainer PIN', js.length > 1000 && !js.includes("'" + PIN + "'") && !js.includes('"' + PIN + '"'))
+check('bundle has NO log token', js.length > 1000 && !js.includes(LOG))
+const deployed = bundleSource === 'the deployed bundle'
+if (deployed) {
+  check('bundle points at PROD convex', js.includes('utmost-gopher-81'))
+  check('bundle has no DEV convex', !js.includes('fine-eagle-220'))
+} else {
+  check('local build points at DEV, as a local build should', js.includes('fine-eagle-220'))
+  check('NOT CHECKED: which deployment the shipped bundle points at', true,
+    '- the deployed bundle could not be read, so this run cannot tell you')
+}
 
 console.log('\n\x1b[1mE · CONCURRENCY (an end-of-class burst)\x1b[0m')
 // The original bug: logEntry read the whole entries table, so every writer held
@@ -218,6 +273,7 @@ const SMOKE = {
   'people:peopleWithTotals':  ['query',    {}],
   // A junk id must answer null rather than throwing - see section H.
   'people:personStats':       ['query',    { id: 'smoke-probe' }],
+  'people:addPerson':         ['mutation', { key: LOG, firstName: 'Smoke', lastName: 'Add' + Date.now() }],
   'people:pledge':            ['mutation', { firstName: 'Smoke', lastName: 'Probe' + Date.now(), meters: 150000 }],
   'worldTour:getSummary':     ['query',    {}],
   'worldTour:getRecent':      ['query',    {}],
