@@ -14,10 +14,10 @@ export default defineSchema({
     input: v.optional(v.number()),
     unit: v.optional(v.string()),
 
-    // Who did it. Optional on purpose: a trainer with five people queued at
-    // the desk must never be blocked from logging because a name will not
-    // resolve. Unattributed meters still move the gym down the road, they
-    // just do not land on anybody's total.
+    // Who did it. logEntry requires this - meters that land on nobody earn no
+    // badge and count toward nobody's pledge, which is the whole point of
+    // pledging - but the column stays optional because rows written before
+    // that rule exist and must still read back.
     //
     // Indexed because per-person totals are read constantly once the lookup
     // exists, and scanning every entry for each of 182 people would not hold.

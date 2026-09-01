@@ -94,7 +94,7 @@ export default function LogPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     const n = machine ? parseAmount(machine, amount) : null
-    if (!machine || n === null || unit === null || busy) return
+    if (!machine || n === null || unit === null || busy || !who) return
     setBusy(true)
     setError('')
     // Taken from the live subscription, not returned by the mutation — which
@@ -105,7 +105,7 @@ export default function LogPage() {
         machine,
         amount: n,
         key: getLogKey(),
-        personId: (who?.id as any) ?? undefined,
+        personId: who!.id as any,
       })
       const after = before + res.journeyMeters
       setOutcome({
@@ -284,9 +284,12 @@ export default function LogPage() {
               placeholder="Type your name…"
             />
             {!who && (
-              <div className="mt-2 text-xs text-zinc-600 leading-relaxed">
-                You can log without a name — the meters still count for the gym, they just
-                will not land on your total.
+              <div className="mt-2 text-xs text-zinc-500 leading-relaxed">
+                Pick your name to log — meters have to land on somebody to count toward
+                your pledge and your badges.{' '}
+                <a href="/join" className="underline" style={{ color: BRAND.pink }}>
+                  Not on the list? Pledge first.
+                </a>
               </div>
             )}
 
@@ -346,7 +349,7 @@ export default function LogPage() {
 
                 <button
                   type="submit"
-                  disabled={parsed === null || busy}
+                  disabled={parsed === null || !who || busy}
                   className="mt-5 w-full py-5 rounded-xl font-black text-base uppercase tracking-widest transition-all disabled:opacity-40"
                   style={{ background: BRAND.red, color: '#fff' }}
                 >

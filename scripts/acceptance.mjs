@@ -46,12 +46,24 @@ const ok = (r) => r.status === 'success'
 const denied = (r) => r.status === 'error'
 const missing = (r) => JSON.stringify(r).includes('Could not find function')
 
+// Every entry now has to land on somebody, so the suite needs a person of its
+// own before it can log anything. It is removed again at the end. Without this
+// the permission checks below would still be denied - just for the wrong
+// reason, which is the failure mode this whole file exists to catch.
+const probe = await call('mutation', 'people:pledge',
+  { firstName: 'Acceptance', lastName: 'Probe' + Date.now(), meters: 1000 })
+const PROBE = probe.value?.id
+if (!PROBE) {
+  console.log('  Could not create the probe person - nothing else can run.')
+  process.exit(1)
+}
+
 console.log('\n\x1b[1mA · PERMISSION MATRIX\x1b[0m')
-check('no key cannot log', denied(await mut('logEntry', { machine: 'Row', amount: 100 })))
+check('no key cannot log', denied(await mut('logEntry', { machine: 'Row', amount: 100, personId: PROBE })))
 check('no key cannot reset', denied(await mut('resetChallenge', {})))
-check('wrong key cannot log', denied(await mut('logEntry', { machine: 'Row', amount: 100, key: 'wrong' })))
+check('wrong key cannot log', denied(await mut('logEntry', { machine: 'Row', amount: 100, key: 'wrong', personId: PROBE })))
 check('wrong key cannot reset', denied(await mut('resetChallenge', { key: 'wrong' })))
-check('LOG token CAN log', ok(await mut('logEntry', { machine: 'Row', amount: 100, key: LOG })))
+check('LOG token CAN log', ok(await mut('logEntry', { machine: 'Row', amount: 100, key: LOG, personId: PROBE })))
 check('LOG token cannot reset', denied(await mut('resetChallenge', { key: LOG })))
 check('LOG token cannot simulate', denied(await mut('simulateDay', { key: LOG })))
 check('LOG token cannot read itself back', denied(await qry('getLogToken', { key: LOG })))
@@ -61,7 +73,7 @@ check('ADMIN key passes verifyTrainer', ok(await mut('verifyTrainer', { key: ADM
 // The trainer PIN is short enough to brute force, so what it CANNOT do
 // matters more than what it can.
 check('PIN logs in as trainer', ok(await mut('verifyTrainer', { key: PIN })))
-check('PIN can log meters', ok(await mut('logEntry', { machine: 'Row', amount: 500, key: PIN })))
+check('PIN can log meters', ok(await mut('logEntry', { machine: 'Row', amount: 500, key: PIN, personId: PROBE })))
 check('PIN can read the QR token', ok(await qry('getLogToken', { key: PIN })))
 check('PIN CANNOT reset the challenge', denied(await mut('resetChallenge', { key: PIN })))
 check('PIN CANNOT simulate a day', denied(await mut('simulateDay', { key: PIN })))
@@ -69,29 +81,34 @@ const pinAdmin = await qry('isAdmin', { key: PIN })
 check('PIN does not report as admin', ok(pinAdmin) && pinAdmin.value === false)
 const keyAdmin = await qry('isAdmin', { key: ADMIN })
 check('ADMIN key reports as admin', ok(keyAdmin) && keyAdmin.value === true)
-check('ADMIN key CAN log', ok(await mut('logEntry', { machine: 'Ski', amount: 100, key: ADMIN })))
+check('ADMIN key CAN log', ok(await mut('logEntry', { machine: 'Ski', amount: 100, key: ADMIN, personId: PROBE })))
 const tok = await qry('getLogToken', { key: ADMIN })
 check('ADMIN key can read the log token', ok(tok) && tok.value === LOG)
 
 console.log('\n\x1b[1mB · INPUT VALIDATION\x1b[0m')
-check('rejects unknown machine', denied(await mut('logEntry', { machine: 'Treadmill', amount: 100, key: LOG })))
-check('rejects zero', denied(await mut('logEntry', { machine: 'Row', amount: 0, key: LOG })))
-check('rejects negative', denied(await mut('logEntry', { machine: 'Row', amount: -500, key: LOG })))
-const over = await mut('logEntry', { machine: 'Row', amount: 70000, key: LOG })
+check('rejects unknown machine', denied(await mut('logEntry', { machine: 'Treadmill', amount: 100, key: LOG, personId: PROBE })))
+check('rejects zero', denied(await mut('logEntry', { machine: 'Row', amount: 0, key: LOG, personId: PROBE })))
+check('rejects negative', denied(await mut('logEntry', { machine: 'Row', amount: -500, key: LOG, personId: PROBE })))
+const over = await mut('logEntry', { machine: 'Row', amount: 70000, key: LOG, personId: PROBE })
 check('rejects over-cap in METERS', denied(over) )
-const overKm = await mut('logEntry', { machine: 'Assault Bike', amount: 70, key: LOG })
+const overKm = await mut('logEntry', { machine: 'Assault Bike', amount: 70, key: LOG, personId: PROBE })
 check('rejects over-cap in KM', denied(overKm))
 
 console.log('\n\x1b[1mC · UNIT CONVERSION (the silent-bug class)\x1b[0m')
-const bike = await mut('logEntry', { machine: 'Assault Bike', amount: 2.08, key: LOG })
+const bike = await mut('logEntry', { machine: 'Assault Bike', amount: 2.08, key: LOG, personId: PROBE })
 check('2.08 km on the bike -> 2080 m', ok(bike) && bike.value.meters === 2080, JSON.stringify(bike.value))
-const bike2 = await mut('logEntry', { machine: 'Assault Bike', amount: 12.4, key: LOG })
+const bike2 = await mut('logEntry', { machine: 'Assault Bike', amount: 12.4, key: LOG, personId: PROBE })
 check('12.4 km -> 12400 m', ok(bike2) && bike2.value.meters === 12400, JSON.stringify(bike2.value))
-const row = await mut('logEntry', { machine: 'Row', amount: 2000, key: LOG })
+const row = await mut('logEntry', { machine: 'Row', amount: 2000, key: LOG, personId: PROBE })
 check('2000 m on the rower stays 2000 m', ok(row) && row.value.meters === 2000, JSON.stringify(row.value))
-const runner = await mut('logEntry', { machine: 'Assault Runner', amount: 1800, key: LOG })
+const runner = await mut('logEntry', { machine: 'Assault Runner', amount: 1800, key: LOG, personId: PROBE })
 check('runner reads METERS not km', ok(runner) && runner.value.meters === 1800, JSON.stringify(runner.value))
 check('journey == real (MULTIPLIER is 1)', ok(row) && row.value.journeyMeters === row.value.meters)
+
+check('an entry with no name is refused',
+  denied(await mut('logEntry', { machine: 'Row', amount: 100, key: LOG })))
+check('an entry naming somebody who is gone is refused, not silently orphaned',
+  denied(await mut('logEntry', { machine: 'Row', amount: 100, key: LOG, personId: 'jd70000000000000000000000000000' })))
 
 console.log('\n\x1b[1mD · QUERIES + SITE\x1b[0m')
 const sum = await qry('getSummary', {})
@@ -131,7 +148,7 @@ console.log('\n\x1b[1mE · CONCURRENCY (an end-of-class burst)\x1b[0m')
 // rather than failing and sending you hunting.
 const N = 30
 const res = await Promise.all(Array.from({ length: N }, (_, i) =>
-  mut('logEntry', { machine: 'Row', amount: 900 + i, key: LOG })))
+  mut('logEntry', { machine: 'Row', amount: 900 + i, key: LOG, personId: PROBE })))
 const conflicts = res.filter((r) => JSON.stringify(r).includes('OptimisticConcurrency')).length
 const throttled = res.filter((r) => JSON.stringify(r).includes('at once')).length
 const succeeded = res.filter(ok).length
@@ -192,7 +209,7 @@ for (const path of ['worldTour:isAdmin', 'worldTour:simulateDay', 'worldTour:res
 // A spare entry to hand to deleteEntry, so its smoke is a real round trip.
 // logEntry does not return the row it inserted, so the id comes back off the
 // recent list instead.
-await mut('logEntry', { machine: 'Row', amount: 250, key: LOG })
+await mut('logEntry', { machine: 'Row', amount: 250, key: LOG, personId: PROBE })
 const spareList = await qry('getRecent', {})
 const spareId = spareList.value?.[0]?.id
 
@@ -208,7 +225,7 @@ const SMOKE = {
   'worldTour:getLogToken':    ['query',    { key: PIN }],
   'worldTour:isAdmin':        ['query',    { key: ADMIN }],
   'worldTour:verifyTrainer':  ['mutation', { key: PIN }],
-  'worldTour:logEntry':       ['mutation', { machine: 'Row', amount: 100, key: LOG }],
+  'worldTour:logEntry':       ['mutation', { machine: 'Row', amount: 100, key: LOG, personId: PROBE }],
   'worldTour:deleteEntry':    ['mutation', { id: spareId, key: PIN }],
   'worldTour:simulateDay':    ['mutation', { key: ADMIN }],
   'worldTour:resetChallenge': ['mutation', { key: ADMIN }],
@@ -285,3 +302,7 @@ console.log(fail === 0
   : '\x1b[31m\x1b[1m  ' + pass + ' passed, ' + fail + ' FAILED\x1b[0m\n  ' + fails.join('\n  '))
 console.log('─'.repeat(52) + '\n')
 process.exit(fail === 0 ? 0 : 1)
+
+// The probe person goes away again; a roster of 207 must not gain a row every
+// time somebody runs the suite.
+if (PROBE) await call('mutation', 'people:removePerson', { id: PROBE, key: PIN })

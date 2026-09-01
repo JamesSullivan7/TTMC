@@ -156,19 +156,22 @@ export const logEntry = mutation({
     machine: v.string(),
     amount: v.number(),
     key: v.optional(v.string()),
-    // Who did it. Optional so a trainer with a queue at the desk is never
-    // blocked by a name that will not resolve — see the note in schema.ts.
-    personId: v.optional(v.id('people')),
+    // Who did it. Required: meters that land on nobody earn no badge and count
+    // toward nobody's pledge, which is the whole point of pledging. Anyone not
+    // yet on the roster pledges first at /join, which creates them.
+    personId: v.id('people'),
   },
   handler: async (ctx, { machine, amount, key, personId }) => {
     requireLogAccess(key ?? '')
     await checkRateLimit(ctx)
 
-    // A stale personId from a phone whose person was merged or removed must
-    // not take the whole entry down with it — drop the attribution, keep the
-    // meters.
-    let person = null
-    if (personId) person = await ctx.db.get(personId)
+    // A stale personId - a phone whose person was merged away, or one that
+    // last logged against the dev deployment - must be told plainly rather
+    // than silently logged against nobody, now that attribution is the point.
+    const person = await ctx.db.get(personId)
+    if (person === null) {
+      throw new Error('That name is no longer on the roster. Pick it again.')
+    }
 
     const unit = machineUnit(machine)
     if (unit === null) throw new Error('Unknown machine')

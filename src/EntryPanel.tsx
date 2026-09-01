@@ -32,7 +32,7 @@ export function EntryForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const n = machine ? parseAmount(machine, amount) : null
-    if (!machine || n === null || unit === null) return
+    if (!machine || n === null || unit === null || !person) return
 
     const asMeters = toMeters(machine, n)
     if (
@@ -52,7 +52,7 @@ export function EntryForm() {
         machine,
         amount: n,
         key: getLogKey(),
-        personId: (person?.id as any) ?? undefined,
+        personId: person!.id as any,
       })
       setAmount('')
       setLastLogged(res.journeyMeters)
@@ -128,7 +128,7 @@ export function EntryForm() {
         </div>
         <button
           type="submit"
-          disabled={!machine || !amount || status === 'saving'}
+          disabled={!machine || !amount || !person || status === 'saving'}
           className="px-5 py-2 rounded-lg font-black text-sm uppercase tracking-wider transition-all disabled:opacity-40"
           style={{ background: status === 'done' ? '#10B981' : BRAND.red, color: '#fff' }}
         >
@@ -138,7 +138,7 @@ export function EntryForm() {
               ? `+${fmt(lastLogged)} m!`
               : person
                 ? `Log for ${person.firstName}`
-                : 'Log it'}
+                : 'Pick a name first'}
         </button>
         {isDistance && status !== 'done' && (
           <span className="text-[11px] self-center" style={{ color: BRAND.pink }}>

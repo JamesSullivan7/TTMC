@@ -96,7 +96,8 @@ export default function PersonPicker({
         >
           {matches.length === 0 ? (
             <div className="px-3 py-3 text-sm text-zinc-500">
-              No match. Check the spelling, or leave it blank.
+              No match. Check the spelling — everyone logging has to be on the
+              roster, and anyone missing pledges first at /join.
             </div>
           ) : (
             matches.map((p) => (
