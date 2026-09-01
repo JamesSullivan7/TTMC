@@ -3,7 +3,7 @@ import { useMutation, useQuery } from 'convex/react'
 import { api } from '../convex/_generated/api'
 import MapView from './MapView'
 import Celebration from './Celebration'
-import { EntryForm, RecentEntries, DemoTools } from './EntryPanel'
+import { EntryForm, RecentEntries } from './EntryPanel'
 import { downloadShareCard } from './shareCard'
 import { clearTrainerKey, getTrainerKey, setTrainerKey } from './keys'
 import {
@@ -729,11 +729,15 @@ export default function App({ castMode = false }: { castMode?: boolean }) {
         </div>
       </div>
 
-      {/* ── Trainer tools ── */}
+      {/* ── Trainer tools ──
+          Undo only. Simulate and reset used to sit here too, and a button
+          that fabricates 273,000 meters has no business on a gym computer
+          during a live challenge: one stray click and the road jumps a day
+          that nobody rode. Both still exist as admin-key mutations for the
+          CLI and for launch day, where a human is deliberately running them. */}
       {!tvMode && kiosk && (
         <div className="max-w-screen-2xl mx-auto px-5 pb-8 space-y-3">
           <RecentEntries />
-          <DemoTools />
         </div>
       )}
     </div>

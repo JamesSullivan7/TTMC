@@ -178,6 +178,17 @@ for (const f of srcFiles) {
   for (const m of text.matchAll(/api\.([a-zA-Z]+)\.([a-zA-Z]+)/g)) referenced.add(m[1] + ':' + m[2])
 }
 
+// Functions with no caller in the UI, which this scan would therefore never
+// see. They are reached from the CLI and from launch day instead, and one of
+// them - isAdmin - is what stage 1 of the launch wizard uses to decide whether
+// the gym is allowed to go live. When the testing-tools row was taken out of
+// the trainer panel these three lost their only api.* reference and their
+// coverage disappeared with it, silently, which is precisely the failure this
+// section exists to prevent.
+for (const path of ['worldTour:isAdmin', 'worldTour:simulateDay', 'worldTour:resetChallenge']) {
+  referenced.add(path)
+}
+
 // A spare entry to hand to deleteEntry, so its smoke is a real round trip.
 // logEntry does not return the row it inserted, so the id comes back off the
 // recent list instead.
