@@ -54,7 +54,13 @@ export function EntryForm() {
         key: getLogKey(),
         personId: person!.id as any,
       })
+      // Clear the whole form, not just the number. At the desk the next person
+      // in the queue is a different person on a different machine, and a name
+      // left sitting in the box is how somebody else's meters end up on their
+      // total. The confirmation lives in the button for a moment either way.
       setAmount('')
+      setPerson(null)
+      setMachine('')
       setLastLogged(res.journeyMeters)
       setOutcome({
         meters: res.meters,

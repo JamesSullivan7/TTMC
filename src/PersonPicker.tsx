@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BRAND, shortName } from './config'
 
 // Find a person by typing. Shared by the trainer's entry form and the phone,
@@ -30,6 +30,15 @@ export default function PersonPicker({
   compact?: boolean
 }) {
   const [q, setQ] = useState('')
+
+  // The × button clears the typed text alongside the selection. A parent that
+  // clears the selection itself - the desk form does, after every entry - has
+  // no way to reach in and do the same, so the box would come back holding the
+  // last person's name with a dropdown open under it. Half-cleared reads as
+  // still-selected, which is how the wrong name gets logged.
+  useEffect(() => {
+    if (value === null) setQ('')
+  }, [value])
 
   const indexed = useMemo(
     () => (people ?? []).map((p) => ({ p, words: p.name.toLowerCase().split(/\s+/) })),
